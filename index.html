@@ -759,8 +759,8 @@
 
 
                 const cardHTML = document.createElement('div');
-                // M25: 再次修正 - 添加卡片宽度和最大宽度
-                cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200 w-full lg:max-w-[calc(50%-0.75rem)]"; 
+                // M25: 再次修正 - 添加卡片宽度和最大宽度, 并添加 self-start
+                cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200 w-full lg:max-w-[calc(50%-0.75rem)] self-start"; 
                 // M8: 新增 - 为卡片添加唯一 ID
                 cardHTML.id = `data-card-${id}`;
                 
@@ -1039,6 +1039,7 @@
          * M22: 修正 - 添加延迟确保渲染完成
          * M23: 修正 - 增加延迟到 700ms
          * M25: 修正 - 增加延迟到 1200ms
+         * M26: 修正 - 增加延迟到 2000ms (2秒)
          */
         window.exportCardAsImage = async (platformId, platformName) => {
             if (typeof html2canvas === 'undefined') {
@@ -1060,8 +1061,8 @@
             const detailsToHide = cardElement.querySelectorAll('details');
             detailsToHide.forEach(detail => detail.style.display = 'none');
 
-            // M25: 增加延迟到 1200ms (原为 700ms)
-            await new Promise(resolve => setTimeout(resolve, 1200));
+            // M26: 增加延迟到 2000ms (原为 1200ms)
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             try {
                 const canvas = await html2canvas(cardElement, {
