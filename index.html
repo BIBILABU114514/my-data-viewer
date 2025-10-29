@@ -759,7 +759,7 @@
 
 
                 const cardHTML = document.createElement('div');
-                // M25: 再次修正 - 添加卡片宽度和最大宽度, 并添加 self-start
+                // M26: 修正 - 添加 self-start 阻止高度拉伸
                 cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200 w-full lg:max-w-[calc(50%-0.75rem)] self-start"; 
                 // M8: 新增 - 为卡片添加唯一 ID
                 cardHTML.id = `data-card-${id}`;
@@ -942,6 +942,8 @@
                     maintainAspectRatio: false,
                     // M3: 修正 #3 - 提高分辨率 (例如 3x)
                     devicePixelRatio: 3, 
+                    // M27: 修正 - 在导出卡片时会动态设置动画，这里保持默认启用
+                    // animation: false, // (移除此行)
                     plugins: {
                         // M4: 禁用折线图的 datalabels, 否则太乱
                         datalabels: {
@@ -1035,11 +1037,47 @@
 
 
         /**
+         * M27: 修正 - 恢复单个图表导出功能
+         * 导出图表为 JPEG 图片。
+         */
+        window.exportChartAsImage = (canvasId, platform, metric) => {
+            const chartInstance = activeCharts[canvasId];
+            if (!chartInstance) {
+                showMessage("图表实例未找到，请稍后再试。", 'error');
+                return;
+            }
+            
+            try {
+                // M27: 修正 - 使用正确的参数调用 toBase64Image
+                // 白色背景由全局插件 whiteBackgroundPlugin 处理
+                // 分辨率由图表选项 devicePixelRatio: 3 处理
+                const dataURL = chartInstance.toBase64Image('image/jpeg', 0.95); // type, quality
+
+                const a = document.createElement('a');
+                a.href = dataURL;
+                const extension = 'jpeg';
+                const fileName = `${platform}-${METRIC_NAMES[metric]}-每日趋势.${extension}`;
+
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showMessage(`图表 [${fileName.replace(`.${extension}`, '')}] 已导出为 JPEG。`, 'success');
+
+            } catch (error) {
+                console.error("导出图表失败:", error);
+                showMessage("导出图表失败，请检查控制台错误。", 'error');
+            }
+        };
+
+
+        /**
          * M8: 新增 - 导出数据卡片为 JPEG 图片
          * M22: 修正 - 添加延迟确保渲染完成
          * M23: 修正 - 增加延迟到 700ms
          * M25: 修正 - 增加延迟到 1200ms
          * M26: 修正 - 增加延迟到 2000ms (2秒)
+         * M27: 修正 - 截图前禁用图表动画
          */
         window.exportCardAsImage = async (platformId, platformName) => {
             if (typeof html2canvas === 'undefined') {
@@ -1053,6 +1091,17 @@
                 return;
             }
             
+            // M27: 查找卡片内的所有图表实例并禁用动画
+            const chartsToPause = [];
+            cardElement.querySelectorAll('canvas').forEach(canvas => {
+                const chartInstance = Chart.getChart(canvas); // 获取 Chart 实例
+                if (chartInstance && chartInstance.options.animation !== false) {
+                    chartInstance.options.animation = false; // 禁用动画
+                    chartInstance.update('none'); // 更新图表（无动画）
+                    chartsToPause.push(chartInstance); // 记录下来以便恢复
+                }
+            });
+
             // 临时隐藏按钮，避免出现在截图中
             const buttonsToHide = cardElement.querySelectorAll('button');
             buttonsToHide.forEach(btn => btn.style.visibility = 'hidden');
@@ -1061,7 +1110,7 @@
             const detailsToHide = cardElement.querySelectorAll('details');
             detailsToHide.forEach(detail => detail.style.display = 'none');
 
-            // M26: 增加延迟到 2000ms (原为 1200ms)
+            // M26: 增加延迟到 2000ms (原为 1200ms) - 仍然保留
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             try {
@@ -1070,8 +1119,7 @@
                     backgroundColor: '#ffffff', // 白色背景
                     useCORS: true,
                     logging: false,
-                    // 确保图片资源加载完成 (虽然这里没有, 但作为好习惯保留)
-                    onrendered: (canvas) => canvas 
+                    onrendered: (canvas) => canvas // 确保图片资源加载完成
                 });
                 
                 const dataURL = canvas.toDataURL('image/jpeg', 0.95);
@@ -1087,6 +1135,12 @@
                 console.error("导出卡片失败:", error);
                 showMessage("导出卡片失败，请查看控制台。", 'error');
             } finally {
+                // M27: 恢复图表动画
+                chartsToPause.forEach(chartInstance => {
+                    chartInstance.options.animation = {}; // 恢复默认动画设置
+                    chartInstance.update('none'); // 无动画更新
+                });
+                
                 // 确保按钮重新显示
                 buttonsToHide.forEach(btn => btn.style.visibility = 'visible');
                 
