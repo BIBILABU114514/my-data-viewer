@@ -122,9 +122,10 @@
     </div>
 
     <!-- 数据展示区域 -->
-    <main id="dataContainer" class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- M24: 再次修正 - 确保 flex-wrap 布局 -->
+    <main id="dataContainer" class="max-w-7xl mx-auto flex flex-wrap gap-6 justify-center">
         <!-- 平台数据卡片将在这里动态生成 -->
-        <p id="loadingText" class="text-center text-gray-500 py-10 lg:col-span-2">
+        <p id="loadingText" class="text-center text-gray-500 py-10 w-full"> 
             <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在加载数据...
         </p>
     </main>
@@ -758,7 +759,8 @@
 
 
                 const cardHTML = document.createElement('div');
-                cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200";
+                // M25: 再次修正 - 添加卡片宽度和最大宽度
+                cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200 w-full lg:max-w-[calc(50%-0.75rem)]"; 
                 // M8: 新增 - 为卡片添加唯一 ID
                 cardHTML.id = `data-card-${id}`;
                 
@@ -1036,6 +1038,7 @@
          * M8: 新增 - 导出数据卡片为 JPEG 图片
          * M22: 修正 - 添加延迟确保渲染完成
          * M23: 修正 - 增加延迟到 700ms
+         * M25: 修正 - 增加延迟到 1200ms
          */
         window.exportCardAsImage = async (platformId, platformName) => {
             if (typeof html2canvas === 'undefined') {
@@ -1057,8 +1060,8 @@
             const detailsToHide = cardElement.querySelectorAll('details');
             detailsToHide.forEach(detail => detail.style.display = 'none');
 
-            // M23: 增加延迟到 700ms (原为 300ms)
-            await new Promise(resolve => setTimeout(resolve, 700));
+            // M25: 增加延迟到 1200ms (原为 700ms)
+            await new Promise(resolve => setTimeout(resolve, 1200));
 
             try {
                 const canvas = await html2canvas(cardElement, {
