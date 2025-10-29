@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>短视频数据统计</title>
+    <title>短视频每日数据对比分析</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Chart.js 用于图表绘制 -->
@@ -1034,6 +1034,7 @@
 
         /**
          * M8: 新增 - 导出数据卡片为 JPEG 图片
+         * M22: 修正 - 添加延迟确保渲染完成
          */
         window.exportCardAsImage = async (platformId, platformName) => {
             if (typeof html2canvas === 'undefined') {
@@ -1052,9 +1053,11 @@
             buttonsToHide.forEach(btn => btn.style.visibility = 'hidden');
 
             // M9: 修正 - 临时隐藏 <details> 元素 (“查看详细数据表格”)
-            // 避免 html2canvas 渲染折叠元素时产生错位
             const detailsToHide = cardElement.querySelectorAll('details');
             detailsToHide.forEach(detail => detail.style.display = 'none');
+
+            // M22: 新增延迟 - 等待300ms确保图表等元素渲染完成
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             try {
                 const canvas = await html2canvas(cardElement, {
@@ -1063,7 +1066,7 @@
                     useCORS: true,
                     logging: false,
                     // 确保图片资源加载完成 (虽然这里没有, 但作为好习惯保留)
-                    onrendered: (canvas) => canvas
+                    onrendered: (canvas) => canvas 
                 });
                 
                 const dataURL = canvas.toDataURL('image/jpeg', 0.95);
@@ -1083,7 +1086,6 @@
                 buttonsToHide.forEach(btn => btn.style.visibility = 'visible');
                 
                 // M9: 修正 - 确保 <details> 元素重新显示
-                // 'block' 是 <details> 元素的默认 display 值
                 detailsToHide.forEach(detail => detail.style.display = 'block');
             }
         };
