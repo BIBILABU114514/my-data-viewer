@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短视频每日数据对比分析</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Chart.js 用于图表绘制 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <!-- M4: 新增 - Chart.js Datalabels 插件 -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <!-- M8: 新增 - 引入 html2canvas 用于导出 HTML 元素 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 引入 Font Awesome 图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --neutral-bg: #f3f4f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--neutral-bg);
+        }
+        .data-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .data-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .text-green-trend { color: var(--success-color); }
+        .text-red-trend { color: var(--danger-color); }
+        .daily-input-table th, .daily-input-table td {
+            padding: 0.5rem 0.25rem;
+            text-align: center;
+        }
+        .daily-input-table input {
+            padding: 0.25rem;
+            width: 100%;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+        }
+        /* 强制 Chart 容器高度和背景色，防止 CLS 并确保清晰 */
+        .chart-container {
+            height: 200px;
+            width: 100%;
+            margin-bottom: 1rem;
+            background-color: #ffffff; /* 确保图表区域有白色背景 */
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }
+        #globalChartContainer .chart-container {
+            height: 350px;
+        }
+        #insight-output summary {
+            list-style: none; /* 移除默认的箭头 */
+        }
+        #insight-output summary::-webkit-details-marker {
+            display: none;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <!-- 主标题和添加按钮 -->
+    <header class="max-w-7xl mx-auto mb-8 flex justify-between items-center">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">短视频每日数据对比分析</h1>
+        <button id="addPlatformBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md flex items-center">
+            <i class="fa-solid fa-plus mr-2"></i>
+            添加平台/每日数据
+        </button>
+    </header>
+    
+    <!-- 全平台对比图表区域 -->
+    <div id="globalChartContainer" class="max-w-7xl mx-auto mb-8 bg-white p-6 rounded-xl shadow-lg border border-gray-200 hidden">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            <h2 class="text-2xl font-bold text-gray-900">全平台播放量对比 (周总和)</h2>
+            <button onclick="exportChartAsImage('globalViewsChart', '所有平台', 'views')"
+                    class="text-gray-500 hover:text-indigo-600 p-1 rounded transition duration-150" title="导出图表为 JPEG">
+                <i class="fa-solid fa-download text-lg"></i>
+            </button>
+        </div>
+        
+        <!-- 新增: 周环比数据概览卡片 -->
+        <div id="globalWoWSummary" class="p-4 mb-4 rounded-lg border bg-indigo-50 border-indigo-200 hidden">
+            <!-- Summary will be injected here by JS -->
+        </div>
+
+        <div class="chart-container" style="height: 350px; background-color: #ffffff;">
+            <canvas id="globalViewsChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 数据展示区域 -->
+    <main id="dataContainer" class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 平台数据卡片将在这里动态生成 -->
+        <p id="loadingText" class="text-center text-gray-500 py-10 lg:col-span-2">
+            <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在加载数据...
+        </p>
+    </main>
+
+    <!-- 模态框 (Modal) 用于添加/编辑数据 -->
+    <div id="dataModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 hidden items-center justify-center p-4" onclick="closeModal(event)">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden data-card" onclick="event.stopPropagation()">
+            <div class="p-6 max-h-[90vh] overflow-y-auto">
+                <h2 id="modalTitle" class="text-2xl font-bold text-gray-800 mb-6">添加每日数据</h2>
+                <form id="dataForm">
+                    <input type="hidden" id="platformId">
+
+                    <!-- 平台名称 -->
+                    <div class="mb-6">
+                        <label for="platformName" class="block text-sm font-medium text-gray-700 mb-1">平台名称 (如：抖音)</label>
+                        <input type="text" id="platformName" required class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5">
+                    </div>
+                    
+                    <!-- 数据指标选择 (R2: Modular Metrics) -->
+                    <div class="mb-6 p-4 border rounded-lg bg-indigo-50">
+                        <p class="text-lg font-bold text-indigo-700 mb-2">数据指标选择 (必选至少一项)</p>
+                        <div id="metricSelection" class="flex flex-wrap gap-4">
+                            <!-- Checkboxes generated by JS -->
+                        </div>
+                    </div>
+
+                    <p class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">每日数据输入 (周一到周五)</p>
+
+                    <!-- M4: 新增 - 手动亮点分析 -->
+                    <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="highlightTitle" class="block text-sm font-medium text-gray-700 mb-1">亮点标题 (可选)</label>
+                            <input type="text" id="highlightTitle" placeholder="例如：XX视频爆款" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5">
+                        </div>
+                        <div>
+                            <label for="highlightReason" class="block text-sm font-medium text-gray-700 mb-1">原因分析 (可选)</label>
+                            <input type="text" id="highlightReason" placeholder="例如：抓住了XX热点" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5">
+                        </div>
+                    </div>
+                    <!-- M4: 结束 -->
+
+                    <!-- 每日数据输入表格 -->
+                    <div class="overflow-x-auto mb-6">
+                        <table class="daily-input-table w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-100 text-gray-600 uppercase tracking-wider">
+                                    <th class="sticky left-0 bg-gray-100 z-10">日期</th>
+                                    <!-- M4: 动态列 - 添加CSS类 -->
+                                    <th colspan="2" class="border-b metric-col-views">播放量 (Views)</th>
+                                    <th colspan="2" class="border-b metric-col-likes">点赞量 (Likes)</th>
+                                    <th colspan="2" class="border-b metric-col-comments">评论量 (Comments)</th>
+                                </tr>
+                                <tr class="bg-gray-50 text-xs text-gray-500">
+                                    <th class="sticky left-0 bg-gray-50 z-10"></th>
+                                    <!-- M4: 动态列 - 添加CSS类 -->
+                                    <th class="metric-col-views">本周</th><th class="metric-col-views">上周</th>
+                                    <th class="metric-col-likes">本周</th><th class="metric-col-likes">上周</th>
+                                    <th class="metric-col-comments">本周</th><th class="metric-col-comments">上周</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dailyInputBody">
+                                <!-- 每日输入行将由 JS 生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 按钮 -->
+                    <div class="flex justify-between items-center pt-4 border-t">
+                        <button type="button" onclick="document.getElementById('dataModal').style.display='none'" class="text-gray-600 hover:text-gray-800 font-medium py-2 px-4 rounded-lg transition duration-150">取消</button>
+                        <div class="flex space-x-3">
+                            <button type="button" id="deleteBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md hidden" onclick="deletePlatform()">
+                                <i class="fa-solid fa-trash mr-1"></i>
+                                删除
+                            </button>
+                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md">
+                                <i class="fa-solid fa-save mr-1"></i>
+                                保存每日数据
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息提示框 -->
+    <div id="messageBox" class="fixed bottom-5 right-5 z-[60] p-4 bg-indigo-600 text-white rounded-lg shadow-xl hidden transition-all duration-300 transform translate-y-full opacity-0">
+        <!-- Message content here -->
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ====================================================================
+        // 1. Firebase 初始化与配置
+        // ====================================================================
+
+        // M10: 本地运行 - Firebase 配置
+        // --------------------------------------------------------------------
+        // ! 重要提示 !
+        // 如果您在自己的电脑上本地运行此文件 (而不是在 Canvas 画布中),
+        // 您需要在此处粘贴您自己的 Firebase 项目配置。
+        // 1. 访问 https://firebase.google.com/ 创建一个新项目。
+        // 2. 在项目中, 创建一个 "Web 应用" (点击 </> 图标)。
+        // 3. 复制 Firebase 提供的 `firebaseConfig` 对象并粘贴到下面。
+        // --------------------------------------------------------------------
+        
+        // M11: 修正 - 已内嵌用户提供的 Firebase 配置
+        const userProvidedConfig = {
+            apiKey: "AIzaSyBmNi0JPJu3sWEBIcbyl86Ujcn9SNSCuc8",
+            authDomain: "my-duanshipin.firebaseapp.com",
+            projectId: "my-duanshipin",
+            storageBucket: "my-duanshipin.firebasestorage.app",
+            messagingSenderId: "262312220829",
+            appId: "1:262312220829:web:1924ef0682737fe3169c74",
+            measurementId: "G-598M54KFQ0"
+        };
+
+        // 检查用户是否提供了配置，如果未提供，则尝试使用 Canvas 环境的配置
+        const firebaseConfig = Object.keys(userProvidedConfig).length > 2 // 检查是否有超过2个键 (简单的检查)
+            ? userProvidedConfig
+            : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {});
+        
+        // appId 也需要同样处理。您可以随意设置一个ID，或者使用您的 projectId
+        const appId = Object.keys(userProvidedConfig).length > 2
+            ? userProvidedConfig.projectId || 'my-local-app' // 使用 projectId 或一个默认值
+            : (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id');
+        // M10: 结束
+        
+        if (Object.keys(firebaseConfig).length === 0) {
+            console.error("Firebase Configuration is missing.");
+            document.getElementById('loadingText').textContent = '错误：Firebase配置缺失，无法加载数据。';
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // 全局状态
+        let userId = null;
+        let platforms = [];
+        const COLLECTION_NAME = 'video_daily_data';
+        const DAYS = ["周一", "周二", "周三", "周四", "周五"];
+        const METRICS = ["views", "likes", "comments"];
+        const METRIC_NAMES = { "views": "播放量", "likes": "点赞量", "comments": "评论量" };
+        let activeCharts = {}; // 用于存储所有 Chart 实例 (个体和全局)
+        let isPresetting = false; // M15: 新增 - 防止重复预制的标志
+
+        // M3: 修正 #1 - 注册一个全局插件，用于在导出时添加白色背景
+        const whiteBackgroundPlugin = {
+          id: 'whiteBackground',
+          beforeDraw: (chart) => {
+            const { ctx, width, height } = chart;
+            ctx.save();
+            // 'destination-over' 会在现有内容 *后面* 绘制
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, width, height);
+            ctx.restore();
+          }
+        };
+        // 注册插件 (ChartDataLabels 会自动注册)
+        Chart.register(whiteBackgroundPlugin);
+
+        // M5: 修正 - 明确注册 Datalabels 插件
+        // 检查 ChartDataLabels 是否已加载 (它会挂载到 Chart 对象上)
+        if (Chart.plugins && Chart.plugins.get('datalabels')) {
+            // 如果它自动注册了 (新版本)，我们不需要做什么
+        } else if (typeof ChartDataLabels !== 'undefined') {
+            // 如果它作为全局变量加载 (旧CDN方式)，手动注册
+             Chart.register(ChartDataLabels);
+        } else {
+            console.warn('ChartDataLabels 插件未找到, 图表上的数字可能无法显示。');
+        }
+
+
+        // 认证状态监听
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                setupDataListener();
+            } else {
+                try {
+                    // M12: 修正 auth/custom-token-mismatch 错误
+                    const isUsingUserConfig = Object.keys(userProvidedConfig).length > 2;
+                    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+                    // (M12) 修正: 
+                    // 如果用户提供了自己的配置 (isUsingUserConfig), 必须
+                    // 强制使用匿名登录 (signInAnonymously), 
+                    // 绝不能使用 Canvas 提供的 initialAuthToken (因为它不匹配用户的项目)。
+                    if (initialAuthToken && !isUsingUserConfig) {
+                        // 只有在 "没有用户配置" 且 "在Canvas环境" 时才使用 custom token
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        // 否则 (在本地运行, 或者在Canvas里用了自己的配置), 始终使用匿名登录
+                        const anonUserCredential = await signInAnonymously(auth);
+                        userId = anonUserCredential.user.uid;
+                        setupDataListener();
+                    }
+                } catch (error) {
+                    console.error("认证失败:", error);
+                    document.getElementById('loadingText').textContent = '错误：用户认证失败，无法加载数据。';
+                }
+            }
+        });
+
+        // 路径辅助函数
+        const getCollectionRef = () => {
+            if (!userId) return null;
+            return collection(db, `artifacts/${appId}/users/${userId}/${COLLECTION_NAME}`);
+        };
+
+        // ====================================================================
+        // 2. 数据处理与渲染
+        // ====================================================================
+
+        /**
+         * 计算周环比增长百分比。
+         */
+        const calculateChange = (current, last) => {
+            if (last === 0) {
+                return current > 0 ? '+∞' : '0.00%';
+            }
+            const change = (current - last) / last;
+            const sign = change >= 0 ? '+' : '';
+            return sign + (change * 100).toFixed(2) + '%';
+        };
+
+        /**
+         * 格式化数字，添加逗号分隔符。
+         */
+        const formatNumber = (num) => {
+            if (num === null || num === undefined || isNaN(num) || num === "") return '';
+            return new Intl.NumberFormat('zh-CN').format(num);
+        };
+        
+        /**
+         * 计算单个平台数据的周总和 (R2: 接受 metrics 列表)。
+         */
+        const calculatePlatformTotals = (dailyData, metrics) => {
+            const totals = { cw: {}, lw: {} };
+            metrics.forEach(metric => {
+                totals.cw[metric] = 0;
+                totals.lw[metric] = 0;
+            });
+
+            DAYS.forEach(day => {
+                metrics.forEach(metric => {
+                    totals.cw[metric] += dailyData[day]?.[`cw_${metric}`] || 0;
+                    totals.lw[metric] += dailyData[day]?.[`lw_${metric}`] || 0;
+                });
+            });
+            return totals;
+        };
+        
+        /**
+         * 计算本周数据亮点 (M1: 只统计单日最高值，并只保留一条)。
+         */
+        const calculateWeeklyHighlights = (dailyData, metrics) => {
+            const highlights = [];
+            
+            metrics.forEach(metric => {
+                let maxDayValue = -1; 
+                let maxDay = '';
+                
+                DAYS.forEach((day) => {
+                    const cw = dailyData[day]?.[`cw_${metric}`] || 0;
+                    
+                    // 1. 寻找单日最高值 (仅本周)
+                    if (cw > maxDayValue) {
+                        maxDayValue = cw;
+                        maxDay = day;
+                    }
+                });
+
+                if (maxDayValue > 0) {
+                    highlights.push({
+                        metricName: METRIC_NAMES[metric],
+                        type: 'Highest Value',
+                        value: maxDayValue,
+                        day: maxDay,
+                        icon: 'fa-star'
+                    });
+                }
+            });
+
+            // M1: 只保留一条（所有指标中的最大值）
+            if (highlights.length > 0) {
+                highlights.sort((a, b) => b.value - a.value); // 按值降序排序
+                return [highlights[0]]; // 返回整体的最高单日亮点
+            }
+            
+            return [];
+        };
+
+        /**
+         * M14: 新增 - 创建一个空的每日数据结构
+         */
+        const createEmptyDailyData = () => {
+            const emptyData = {};
+            DAYS.forEach(day => {
+                emptyData[day] = {};
+                // M15: 移除预制的 '0'。 getVal 会处理 undefined。
+                // METRICS.forEach(metric => {
+                //     emptyData[day][`cw_${metric}`] = 0; 
+                //     emptyData[day][`lw_${metric}`] = 0;
+                // });
+            });
+            return emptyData;
+        };
+
+        /**
+         * (新增功能) 计算并渲染全平台总播放量的周环比概览卡片
+         * @param {Array<Object>} platforms - 所有平台数据
+         */
+        const renderGlobalWoWSummary = (platforms) => {
+            const summaryDiv = document.getElementById('globalWoWSummary');
+            
+            // 1. 过滤出有 views 指标的平台
+            const viewsPlatforms = platforms.filter(p => p.metrics.includes('views'));
+
+            if (viewsPlatforms.length === 0) {
+                summaryDiv.classList.add('hidden');
+                return;
+            }
+
+            // 2. 计算总和
+            let grandTotalCW = 0;
+            let grandTotalLW = 0;
+
+            viewsPlatforms.forEach(p => {
+                const totals = calculatePlatformTotals(p.dailyData, p.metrics);
+                grandTotalCW += totals.cw['views'] || 0;
+                grandTotalLW += totals.lw['views'] || 0;
+            });
+            
+            // 3. 计算周环比变化
+            const changeStr = calculateChange(grandTotalCW, grandTotalLW);
+            const isPositive = changeStr.startsWith('+') || changeStr === '0.00%';
+            const trendClass = isPositive ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
+            const iconClass = isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
+
+            // 4. 生成 HTML
+            summaryDiv.classList.remove('hidden');
+            summaryDiv.className = `p-4 mb-4 rounded-lg border ${isPositive ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`;
+            summaryDiv.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                    <div class="mb-2 sm:mb-0">
+                        <p class="text-sm font-medium text-gray-700">全平台播放量总和</p>
+                        <p class="text-3xl font-extrabold text-gray-900">${formatNumber(grandTotalCW)}</p>
+                    </div>
+                    <div class="flex items-center space-x-2 p-2 rounded-lg font-bold ${trendClass}">
+                        <i class="fa-solid ${iconClass} text-xl"></i>
+                        <span class="text-2xl">${changeStr}</span>
+                        <!-- M4: 移除 (WoW) -->
+                        <span class="text-sm font-medium text-gray-700 ml-2">(周环比)</span>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        /**
+         * 渲染全平台播放量对比图表。
+         */
+        const renderGlobalComparisonChart = (platforms) => {
+            const container = document.getElementById('globalChartContainer');
+            const ctx = document.getElementById('globalViewsChart');
+            const canvasId = ctx.id;
+            
+            // 渲染周环比概览卡片
+            renderGlobalWoWSummary(platforms);
+
+            // 过滤掉没有 views 指标的平台
+            const viewsPlatforms = platforms.filter(p => p.metrics.includes('views'));
+
+            if (viewsPlatforms.length === 0) {
+                container.classList.add('hidden');
+                if (activeCharts[canvasId]) {
+                    activeCharts[canvasId].destroy();
+                    delete activeCharts[canvasId];
+                }
+                return;
+            }
+
+            container.classList.remove('hidden');
+
+            // 准备数据数组
+            const platformNames = [];
+            const cwViews = [];
+            const lwViews = [];
+            let maxView = 0; // M4: 用于计算Y轴最大值
+
+            viewsPlatforms.forEach(p => {
+                const totals = calculatePlatformTotals(p.dailyData, p.metrics);
+                platformNames.push(p.platform);
+                
+                const cw = totals.cw['views'] || 0;
+                const lw = totals.lw['views'] || 0;
+                
+                cwViews.push(cw);
+                lwViews.push(lw);
+                
+                if (cw > maxView) maxView = cw;
+                if (lw > maxView) maxView = lw;
+            });
+
+            // 销毁旧图表实例
+            if (activeCharts[canvasId]) {
+                activeCharts[canvasId].destroy();
+            }
+
+            // 创建新的条形图
+            const newChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: platformNames,
+                    datasets: [
+                        {
+                            label: '本周播放量 (CW)',
+                            data: cwViews,
+                            backgroundColor: 'rgb(79, 70, 229)', // Indigo
+                            borderColor: 'rgb(79, 70, 229)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '上周播放量 (LW)',
+                            data: lwViews,
+                            backgroundColor: 'rgb(245, 158, 11)',
+                            borderColor: 'rgb(245, 158, 11)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    // M3: 修正 #2 - 提高分辨率 (例如 3x)
+                    devicePixelRatio: 3, 
+                    plugins: {
+                        legend: { position: 'top' },
+                        // M4: 新增 - Datalabels
+                        // M6: 美化 - 调整 Datalabels 样式
+                        datalabels: {
+                            anchor: 'end', // 锚点在柱子顶端
+                            align: 'end',  // 对齐到顶端
+                            offset: 8,     // M6: 增加到 8px 间距
+                            color: '#1F2937', // M6: text-gray-800, 更深的颜色
+                            font: {
+                                weight: 'bold', // M6: 加粗
+                                size: 12         // M6: 增大字号到 12
+                            },
+                            // 使用 formatNumber 函数
+                            formatter: (value, context) => {
+                                // 如果值为0则不显示
+                                return value > 0 ? formatNumber(value) : null;
+                            }
+                        },
+                        // M4: 结束
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    let label = context.dataset.label.split(' (')[0] || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatNumber(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            // M4: 为 datalabels 增加顶部空间
+                            suggestedMax: maxView * 1.15, // 增加 15% 顶部 padding
+                            beginAtZero: true,
+                            title: { display: true, text: '总播放量' },
+                            ticks: {
+                                callback: function(value) {
+                                    return formatNumber(value);
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+            activeCharts[canvasId] = newChart;
+        };
+
+
+        /**
+         * 动态渲染数据卡片和图表。
+         */
+        const renderDataCards = () => {
+            const container = document.getElementById('dataContainer');
+            container.innerHTML = ''; 
+            
+            if (platforms.length === 0) {
+                container.innerHTML = `
+                    <div class="lg:col-span-2 p-10 text-center bg-white rounded-xl shadow-lg border border-dashed border-gray-300">
+                        <i class="fa-solid fa-chart-line text-5xl text-gray-300 mb-4"></i>
+                        <p class="text-xl font-semibold text-gray-600 mb-2">暂无每日数据</p>
+                        <p class="text-gray-500">点击“添加平台/每日数据”按钮开始记录。</p>
+                    </div>
+                `;
+                return;
+            }
+
+            platforms.forEach(p => {
+                // M4: 解构出新增的字段
+                const { id, platform, dailyData, metrics, highlightTitle, highlightReason } = p;
+                
+                // 1. 计算周总和 (使用平台自己的 metrics)
+                const totals = calculatePlatformTotals(dailyData, metrics);
+                const highlights = calculateWeeklyHighlights(dailyData, metrics); // M1: 修正后的亮点计算
+
+                // 2. 渲染总览卡片
+                let summaryHTML = metrics.map(metric => {
+                    const cwTotal = totals.cw[metric];
+                    const lwTotal = totals.lw[metric];
+                    const changeStr = calculateChange(cwTotal, lwTotal);
+                    const isPositive = changeStr.startsWith('+') || changeStr === '0.00%';
+                    const trendClass = isPositive ? 'text-green-trend' : 'text-red-trend';
+                    const iconClass = isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
+
+                    return `
+                        <div class="col-span-1 border-t pt-3 flex flex-col items-center sm:items-start">
+                            <p class="text-sm font-medium text-gray-500">${METRIC_NAMES[metric]} 总和</p>
+                            <p class="text-2xl font-bold text-indigo-700 mt-1">${formatNumber(cwTotal)}</p>
+                            <p class="text-xs ${trendClass} font-bold mt-1 flex items-center">
+                                ${changeStr === '+∞' ? '<i class="fa-solid fa-infinity mr-1"></i>' : `<i class="fa-solid ${iconClass} mr-1"></i>`}
+                                ${changeStr} (周环比)
+                            </p>
+                            <p class="text-xs text-gray-400 mt-1">上周: ${formatNumber(lwTotal)}</p>
+                        </div>
+                    `;
+                }).join('');
+
+                // 3. 渲染亮点卡片 (M1: 只显示一个亮点)
+                const highlightsHTML = highlights.map(h => {
+                    let displayValue = formatNumber(h.value);
+                    let description = `单日最高值出现在 ${h.day}`; 
+
+                    return `
+                        <li class="flex items-center space-x-2 text-sm text-gray-700">
+                            <i class="fa-solid ${h.icon} text-purple-500"></i>
+                            <span class="font-semibold text-gray-900">${h.metricName}</span>: 
+                            <span class="font-bold text-indigo-600">${displayValue}</span> (${description})
+                        </li>
+                    `;
+                }).join('');
+
+
+                const cardHTML = document.createElement('div');
+                cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200";
+                // M8: 新增 - 为卡片添加唯一 ID
+                cardHTML.id = `data-card-${id}`;
+                
+                // M4: 组合自动亮点和手动分析
+                const hasAutoHighlight = highlights.length > 0;
+                const hasManualHighlight = highlightTitle || highlightReason;
+                let finalHighlightsContent = '';
+
+                if (hasAutoHighlight) {
+                    finalHighlightsContent += `<ul class="space-y-1 ${hasManualHighlight ? 'mb-3 pb-3 border-b border-green-200' : ''}">${highlightsHTML}</ul>`;
+                }
+                if (hasManualHighlight) {
+                    const titleHTML = highlightTitle ? `<p class="font-semibold text-gray-800"><i class="fa-solid fa-pen-to-square mr-1 text-purple-500"></i> ${highlightTitle}</p>` : '';
+                    const reasonHTML = highlightReason ? `<p class="text-gray-700 mt-1 ${highlightTitle ? 'pl-5' : ''}"><i class="fa-solid fa-lightbulb mr-1 text-yellow-500"></i> ${highlightReason}</p>` : '';
+                    finalHighlightsContent += `<div class="text-sm">${titleHTML}${reasonHTML}</div>`;
+                }
+                
+                cardHTML.innerHTML = `
+                    <!-- 平台名称和操作按钮 -->
+                    <div class="flex justify-between items-center mb-4 border-b pb-4">
+                        <!-- M7: 修正 - 移除平台名称后的指标列表 -->
+                        <h2 class="text-2xl font-extrabold text-gray-900">${platform}</h2>
+                        <div class="flex space-x-2">
+                            <!-- M13: 移除 AI 洞察按钮 -->
+                            
+                            <!-- M8: 新增 - 导出卡片按钮 -->
+                            <button id="exportCardBtn-${id}" onclick="exportCardAsImage('${id}', '${platform}')" class="text-gray-500 hover:text-indigo-600 transition duration-150" title="导出此卡片为图片">
+                                <i class="fa-solid fa-image text-lg"></i>
+                            </button>
+                            
+                            <button onclick="editPlatform('${id}')" class="text-gray-500 hover:text-indigo-600 transition duration-150" title="编辑数据">
+                                <i class="fa-solid fa-edit text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 每日数据总览 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+                        ${summaryHTML}
+                    </div>
+                    
+                    <!-- M4: 修正 - 本周数据亮点 (总是显示) -->
+                    <div class="mb-6 p-4 border rounded-lg bg-green-50 border-green-300">
+                        <p class="font-bold text-green-700 mb-2 flex items-center">
+                            <i class="fa-solid fa-trophy mr-2"></i> 本周数据亮点
+                        </p>
+                        ${ (hasAutoHighlight || hasManualHighlight) ? finalHighlightsContent : '<p class="text-sm text-gray-600">暂无数据亮点，可编辑添加分析。</p>' }
+                    </div>
+
+
+                    <!-- M13: 移除 AI 洞察报告显示区域 -->
+
+
+                    <!-- 每日趋势图表 -->
+                    <div class="pt-4 border-t">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">每日趋势对比 (周一到周五)</h3>
+                        
+                        <!-- M11: 修正 - 移除 xl:grid-cols-3，强制图表竖向排列 -->
+                        <div class="grid grid-cols-1 gap-6">
+                            
+                            ${metrics.map(metric => `
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <p class="font-medium text-sm text-gray-600">${METRIC_NAMES[metric]} 变化</p>
+                                        <button onclick="exportChartAsImage('chart-${id}-${metric}', '${platform}', '${metric}')" 
+                                                class="text-gray-500 hover:text-indigo-600 p-1 rounded transition duration-150" title="导出图表为 JPEG">
+                                            <i class="fa-solid fa-download text-xs"></i>
+                                        </button>
+                                    </div>
+                                    <div class="chart-container">
+                                        <canvas id="chart-${id}-${metric}"></canvas>
+                                    </div>
+                                    <details class="text-sm mt-3">
+                                        <summary class="cursor-pointer font-medium text-indigo-600 hover:text-indigo-800">查看详细数据表格</summary>
+                                        <div class="overflow-x-auto mt-2 bg-white rounded-lg p-2 border">
+                                            ${generateDailyTable(dailyData, metric)}
+                                        </div>
+                                    </details>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(cardHTML);
+
+                // 4. 渲染图表
+                setTimeout(() => {
+                    metrics.forEach(metric => { // R2: 仅渲染选中的指标
+                        createDailyChart(`chart-${id}-${metric}`, platform, metric, dailyData);
+                    });
+                }, 10);
+            });
+        };
+        
+        /**
+         * 生成每日数据详细表格 (R2: 仅显示选中的指标)
+         */
+        const generateDailyTable = (dailyData, metric) => {
+            const rows = DAYS.map(day => {
+                // 即使指标被禁用，表格也会显示 0，但我们在这里知道它是被选中的，所以直接显示
+                const cw = dailyData[day]?.[`cw_${metric}`] || 0;
+                const lw = dailyData[day]?.[`lw_${metric}`] || 0;
+                const changeStr = calculateChange(cw, lw);
+                const trendClass = changeStr.startsWith('+') || changeStr === '0.00%' ? 'text-green-trend' : 'text-red-trend';
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="font-semibold">${day}</td>
+                        <td class="text-indigo-700">${formatNumber(cw)}</td>
+                        <td class="text-gray-500">${formatNumber(lw)}</td>
+                        <td class="${trendClass} font-bold text-sm">${changeStr}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            return `
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-xs uppercase text-gray-500 border-b">
+                            <th>日期</th>
+                            <th>本周 (${METRIC_NAMES[metric]})</th>
+                            <th>上周 (${METRIC_NAMES[metric]})</th>
+                            <th>周环比</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        /**
+         * 创建 Chart.js 折线图 
+         */
+        const createDailyChart = (canvasId, platformName, metricKey, dailyData) => {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            
+            // 如果图表已存在，先销毁
+            if (activeCharts[canvasId]) {
+                activeCharts[canvasId].destroy();
+            }
+
+            const cwData = DAYS.map(day => dailyData[day]?.[`cw_${metricKey}`] || 0);
+            const lwData = DAYS.map(day => dailyData[day]?.[`lw_${metricKey}`] || 0);
+
+            const newChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: DAYS,
+                    datasets: [
+                        {
+                            label: '本周',
+                            data: cwData,
+                            borderColor: 'rgb(79, 70, 229)', // indigo-600
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4
+                        },
+                        {
+                            label: '上周',
+                            data: lwData,
+                            borderColor: 'rgb(156, 163, 175)', // gray-400
+                            backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    // M3: 修正 #3 - 提高分辨率 (例如 3x)
+                    devicePixelRatio: 3, 
+                    plugins: {
+                        // M4: 禁用折线图的 datalabels, 否则太乱
+                        datalabels: {
+                            display: false
+                        },
+                        legend: { display: true, position: 'top' },
+                        title: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatNumber(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatNumber(value);
+                                }
+                            }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+            activeCharts[canvasId] = newChart;
+        };
+        
+        /**
+         * M3: 修正 #4 - 导出图表为 JPEG 图片 (已修正)。
+         * 分辨率和背景色已在图表配置中设置 (devicePixelRatio: 3 和 whiteBackgroundPlugin)。
+         */
+        window.exportChartAsImage = (canvasId, platform, metric) => {
+            const chartInstance = activeCharts[canvasId];
+            if (!chartInstance) {
+                showMessage("图表实例未找到，请稍后再试。", 'error');
+                return;
+            }
+            
+            try {
+                // M3: 修正 - 导出为 JPEG, 质量 0.95。
+                // Chart.js 的 toBase64Image 第二个参数是 JPEG 质量 (0-1)。
+                // 背景色和分辨率已在创建图表时通过插件和 options 定义。
+                const dataURL = chartInstance.toBase64Image('image/jpeg', 0.95); 
+
+                const a = document.createElement('a');
+                a.href = dataURL;
+                const extension = 'jpeg';
+                const fileName = canvasId === 'globalViewsChart' 
+                    ? `全平台-播放量对比.${extension}` 
+                    : `${platform}-${METRIC_NAMES[metric]}-每日趋势.${extension}`;
+
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showMessage(`图表 [${fileName.replace(`.${extension}`, '')}] 已导出为高分辨率 JPEG。`, 'success');
+
+            } catch (error) {
+                console.error("导出图表失败:", error);
+                showMessage("导出图表失败，请检查控制台错误。", 'error');
+            }
+        };
+
+        /**
+         * M8: 新增 - 导出数据卡片为 JPEG 图片
+         */
+        window.exportCardAsImage = async (platformId, platformName) => {
+            if (typeof html2canvas === 'undefined') {
+                showMessage("导出库 (html2canvas) 未加载。", 'error');
+                return;
+            }
+
+            const cardElement = document.getElementById(`data-card-${platformId}`);
+            if (!cardElement) {
+                showMessage("未找到卡片元素。", 'error');
+                return;
+            }
+            
+            // 临时隐藏按钮，避免出现在截图中
+            const buttonsToHide = cardElement.querySelectorAll('button');
+            buttonsToHide.forEach(btn => btn.style.visibility = 'hidden');
+
+            // M9: 修正 - 临时隐藏 <details> 元素 (“查看详细数据表格”)
+            // 避免 html2canvas 渲染折叠元素时产生错位
+            const detailsToHide = cardElement.querySelectorAll('details');
+            detailsToHide.forEach(detail => detail.style.display = 'none');
+
+            try {
+                const canvas = await html2canvas(cardElement, {
+                    scale: 3, // 高分辨率
+                    backgroundColor: '#ffffff', // 白色背景
+                    useCORS: true,
+                    logging: false,
+                    // 确保图片资源加载完成 (虽然这里没有, 但作为好习惯保留)
+                    onrendered: (canvas) => canvas
+                });
+                
+                const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = `${platformName}-数据总览.jpeg`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showMessage(`卡片 [${platformName}] 已导出为 JPEG。`, 'success');
+
+            } catch (error) {
+                console.error("导出卡片失败:", error);
+                showMessage("导出卡片失败，请查看控制台。", 'error');
+            } finally {
+                // 确保按钮重新显示
+                buttonsToHide.forEach(btn => btn.style.visibility = 'visible');
+                
+                // M9: 修正 - 确保 <details> 元素重新显示
+                // 'block' 是 <details> 元素的默认 display 值
+                detailsToHide.forEach(detail => detail.style.display = 'block');
+            }
+        };
+
+
+        /**
+         * 启动 Firestore 数据监听。 
+         */
+        const setupDataListener = () => {
+            const colRef = getCollectionRef();
+            if (!colRef) return;
+
+            onSnapshot(colRef, async (snapshot) => {
+                
+                // M14: 新增 - 检查是否为首次加载 (数据库为空)
+                // M15: 修正 - 防止重复预制
+                if (snapshot.empty && !isPresetting) {
+                    isPresetting = true; // (M15) 设置标志，防止重复
+                    // 数据库为空，为用户预制平台
+                    const loadingElement = document.getElementById('loadingText');
+                    if (loadingElement) {
+                        loadingElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> 首次加载，正在为您预制平台...';
+                        loadingElement.style.display = 'block';
+                    }
+
+                    try {
+                        const colRef = getCollectionRef();
+                        if (!colRef) return; // 再次检查
+
+                        const presetPlatforms = [
+                            "视频号", "快手", "小红书", "微博", "百家号", 
+                            "B站", "今日头条", "喜马拉雅"
+                        ];
+                        const emptyData = createEmptyDailyData();
+                        
+                        // 批量创建文档
+                        const addPromises = presetPlatforms.map(platformName => {
+                            const platformData = {
+                                platform: platformName,
+                                dailyData: emptyData,
+                                metrics: ["views"], // M14: 默认只启用 "views"
+                                highlightTitle: "",
+                                highlightReason: ""
+                            };
+                            return addDoc(colRef, platformData);
+                        });
+
+                        await Promise.all(addPromises);
+                        showMessage("已为您预制了8个常用平台！", "success");
+                        isPresetting = false; // (M15) 成功后重置
+                        // onSnapshot 会自动重新触发，并进入下面的 'else' 块
+
+                    } catch (error) {
+                        console.error("预制平台失败:", error);
+                        showMessage("自动预制平台失败，请检查数据库权限。", "error");
+                        if (loadingElement) {
+                            loadingElement.textContent = '自动预制平台失败，请刷新重试。';
+                        }
+                        isPresetting = false; // (M15) 失败后重置
+                    }
+
+                } else if (!snapshot.empty) { // M15: 确保只有在不为空且不在预制时才渲染
+                    // 数据库已有数据，正常加载
+                    platforms = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        // 确保 metrics 字段存在，如果缺失则默认为所有指标
+                        metrics: doc.data().metrics || METRICS, 
+                        ...doc.data()
+                    }));
+                    platforms.sort((a, b) => a.platform.localeCompare(b.platform, 'zh-CN'));
+                    
+                    const loadingElement = document.getElementById('loadingText'); 
+                    if (loadingElement) {
+                        loadingElement.style.display = 'none';
+                    }
+
+                    renderGlobalComparisonChart(platforms); 
+                    renderDataCards(); 
+                }
+
+            }, (error) => {
+                console.error("Error listening to Firestore:", error);
+                const loadingElement = document.getElementById('loadingText');
+                if (loadingElement) {
+                    loadingElement.textContent = '数据加载失败。请检查控制台错误信息。';
+                    loadingElement.style.display = 'block';
+                }
+            });
+        };
+        
+        
+        // M13: 移除 Gemini API (fetchWithBackoff 和 generateInsight)
+        
+
+        // ====================================================================
+        // 3. 模态框与表单处理 (M13: 序号从 4 改为 3)
+        // ====================================================================
+
+        const dataModal = document.getElementById('dataModal');
+        const dataForm = document.getElementById('dataForm');
+        const platformIdInput = document.getElementById('platformId');
+        const modalTitle = document.getElementById('modalTitle');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const dailyInputBody = document.getElementById('dailyInputBody');
+        const metricSelectionDiv = document.getElementById('metricSelection');
+        
+        // M4: 新增 - 动态显隐表格列
+        window.toggleMetricColumn = (metric) => {
+            const isChecked = document.getElementById(`metric-${metric}`)?.checked;
+            const cells = document.querySelectorAll(`.metric-col-${metric}`);
+            // 使用 'table-cell' 来正确显示表格单元格，'none' 来隐藏
+            cells.forEach(cell => {
+                cell.style.display = isChecked ? 'table-cell' : 'none';
+            });
+        };
+        
+        // M4: 新增 - 更新所有列的可见性
+        const updateMetricColumnVisibility = () => {
+            METRICS.forEach(metric => {
+                toggleMetricColumn(metric);
+            });
+        };
+
+        /**
+         * 生成每日输入行。
+         */
+        const generateDailyInputRows = (initialData = {}) => {
+            const getVal = (day, period, metric) => {
+                const value = initialData[day]?.[`${period}_${metric}`];
+                // M15: 修正 - 如果值是 0 或未定义，返回空字符串
+                return (value !== undefined && value !== null && value !== 0 && value !== "") ? value : '';
+            };
+
+            dailyInputBody.innerHTML = DAYS.map(day => {
+                return `
+                    <tr class="border-b border-gray-100">
+                        <td class="sticky left-0 bg-white font-medium text-gray-700 z-10">${day}</td>
+                        ${METRICS.map(metric => `
+                            <!-- M4: 动态列 - 添加CSS类 -->
+                            <td class="metric-col-${metric}"><input type="number" id="${day}_cw_${metric}" value="${getVal(day, 'cw', metric)}" min="0"></td>
+                            <td class="metric-col-${metric}"><input type="number" id="${day}_lw_${metric}" value="${getVal(day, 'lw', metric)}" min="0"></td>
+                        `).join('')}
+                    </tr>
+                `;
+            }).join('');
+        };
+        
+        /**
+         * 生成指标选择 Checkboxes (R2)。
+         */
+        const generateMetricCheckboxes = (activeMetrics = METRICS) => {
+            metricSelectionDiv.innerHTML = METRICS.map(metric => {
+                const checked = activeMetrics.includes(metric) ? 'checked' : '';
+                return `
+                    <label class="flex items-center space-x-2 cursor-pointer p-2 bg-white rounded-lg border shadow-sm hover:border-indigo-400 transition duration-100">
+                        <!-- M4: 动态列 - 添加 onchange 事件 -->
+                        <input type="checkbox" id="metric-${metric}" value="${metric}" ${checked} 
+                               onchange="toggleMetricColumn('${metric}')"
+                               class="form-checkbox h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                        <span class="text-sm font-medium text-gray-700">${METRIC_NAMES[metric]}</span>
+                    </label>
+                `;
+            }).join('');
+        };
+
+
+        /**
+         * 显示消息提示。
+         */
+        const showMessage = (message, type = 'info') => {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+
+            let bgColor = 'bg-indigo-600';
+            if (type === 'success') bgColor = 'bg-green-600';
+            if (type === 'error') bgColor = 'bg-red-600';
+
+            messageBox.className = `fixed bottom-5 right-5 z-[60] p-4 text-white rounded-lg shadow-xl transition-all duration-300 ${bgColor}`;
+            setTimeout(() => {
+                messageBox.classList.remove('translate-y-full', 'opacity-0');
+                messageBox.classList.add('translate-y-0', 'opacity-100');
+            }, 50);
+
+            setTimeout(() => {
+                messageBox.classList.remove('translate-y-0', 'opacity-100');
+                messageBox.classList.add('translate-y-full', 'opacity-0');
+                setTimeout(() => { messageBox.classList.add('hidden'); }, 300);
+            }, 3000);
+
+            messageBox.classList.remove('hidden');
+        };
+
+
+        /**
+         * 打开模态框进行添加。
+         */
+        window.openAddModal = () => {
+            modalTitle.textContent = '添加平台数据';
+            dataForm.reset();
+            platformIdInput.value = '';
+            deleteBtn.classList.add('hidden');
+            
+            // M4: 清空亮点字段
+            document.getElementById('highlightTitle').value = "";
+            document.getElementById('highlightReason').value = "";
+
+            generateMetricCheckboxes(METRICS); // 默认全选
+            generateDailyInputRows({}); 
+            
+            // M4: 更新列可见性
+            updateMetricColumnVisibility();
+            
+            dataModal.style.display = 'flex';
+        };
+
+        /**
+         * 打开模态框进行编辑。
+         */
+        window.editPlatform = (id) => {
+            const platformData = platforms.find(p => p.id === id);
+            if (!platformData) return;
+
+            modalTitle.textContent = `编辑 ${platformData.platform} 每日数据`;
+            platformIdInput.value = id;
+            deleteBtn.classList.remove('hidden');
+
+            document.getElementById('platformName').value = platformData.platform;
+            
+            // M4: 新增 - 填充亮点
+            document.getElementById('highlightTitle').value = platformData.highlightTitle || "";
+            document.getElementById('highlightReason').value = platformData.highlightReason || "";
+
+            generateMetricCheckboxes(platformData.metrics || METRICS); // R2: 填充选中的指标
+            generateDailyInputRows(platformData.dailyData); // 填充现有数据
+
+            // M4: 更新列可见性
+            updateMetricColumnVisibility();
+
+            dataModal.style.display = 'flex';
+        };
+        
+        /**
+         * 关闭模态框 (点击背景时)。
+         */
+        window.closeModal = (event) => {
+            if (event.target.id === 'dataModal') {
+                dataModal.style.display = 'none';
+            }
+        };
+
+        /**
+         * 表单提交处理函数。
+         */
+        dataForm.onsubmit = async (e) => {
+            e.preventDefault();
+
+            if (!userId) {
+                showMessage("用户未认证，请稍候再试。", 'error');
+                return;
+            }
+
+            // 1. 收集选中的指标 (R2)
+            const selectedMetrics = METRICS.filter(metric => 
+                document.getElementById(`metric-${metric}`).checked
+            );
+
+            if (selectedMetrics.length === 0) {
+                showMessage("请至少选择一个数据指标！", 'error');
+                return;
+            }
+
+            const id = platformIdInput.value;
+            const platformName = document.getElementById('platformName').value.trim();
+            const newDailyData = {};
+
+            // 2. 收集每日输入数据
+            DAYS.forEach(day => {
+                newDailyData[day] = {};
+                METRICS.forEach(metric => {
+                    // 使用 parseInt() 确保值为数字，如果为空则默认为 0
+                    const cwValue = parseInt(document.getElementById(`${day}_cw_${metric}`).value) || 0;
+                    const lwValue = parseInt(document.getElementById(`${day}_lw_${metric}`).value) || 0;
+
+                    // 即使未选中，也保存为 0，确保数据结构完整性，但渲染时只使用 selectedMetrics
+                    newDailyData[day][`cw_${metric}`] = cwValue;
+                    newDailyData[day][`lw_${metric}`] = lwValue;
+                });
+            });
+
+            const platformData = {
+                platform: platformName,
+                dailyData: newDailyData,
+                metrics: selectedMetrics, // R2: 保存选中的指标
+                // M4: 新增 - 保存亮点
+                highlightTitle: document.getElementById('highlightTitle').value.trim() || "",
+                highlightReason: document.getElementById('highlightReason').value.trim() || ""
+            };
+
+            try {
+                if (id) {
+                    const docRef = doc(db, `artifacts/${appId}/users/${userId}/${COLLECTION_NAME}`, id);
+                    await setDoc(docRef, platformData);
+                    showMessage(`平台 [${platformName}] 每日数据已更新!`, 'success');
+                } else {
+                    const colRef = getCollectionRef();
+                    if (colRef) {
+                        await addDoc(colRef, platformData);
+                        showMessage(`平台 [${platformName}] 每日数据已添加!`, 'success');
+                    }
+                }
+                dataModal.style.display = 'none';
+            } catch (error) {
+                console.error("保存数据失败:", error);
+                showMessage("保存数据失败，请查看控制台错误。", 'error');
+            }
+        };
+
+        /**
+         * 删除平台数据。
+         */
+        window.deletePlatform = async () => {
+            if (!userId) {
+                showMessage("用户未认证，无法删除。", 'error');
+                return;
+            }
+            
+            const id = platformIdInput.value;
+            const platformName = document.getElementById('platformName').value;
+
+            // M16: 修正 - 移除了 window.confirm()
+            // 之前的 window.confirm() 会在当前环境中被屏蔽，导致功能失效。
+            // 理想情况下应使用自定义模态框，但为了快速修复，我们先让删除功能可用。
+            // if (!window.confirm(`确定要删除平台 [${platformName}] 的数据吗？`)) {
+            //     return;
+            // }
+
+            try {
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/${COLLECTION_NAME}`, id);
+                await deleteDoc(docRef);
+                showMessage(`平台 [${platformName}] 数据已删除!`, 'success');
+                dataModal.style.display = 'none';
+            } catch (error) {
+                console.error("删除数据失败:", error);
+                showMessage("删除数据失败，请查看控制台错误。", 'error');
+            }
+        };
+
+        // 绑定添加按钮事件
+        document.getElementById('addPlatformBtn').onclick = window.openAddModal;
+
+    </script>
+</body>
+</html>
+
