@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>短视频每日数据对比分析</title>
+    <title>短视频数据统计</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Chart.js 用于图表绘制 -->
@@ -817,9 +817,8 @@
                     <div class="pt-4 border-t">
                         <h3 class="text-xl font-semibold text-gray-800 mb-4">每日趋势对比 (周一到周五)</h3>
                         
-                        <!-- M11: 修正 - 移除 xl:grid-cols-3，强制图表竖向排列 -->
-                        <!-- M18: 修正 - 改回 xl:grid-cols-3，允许图表横排 -->
-                        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        <!-- M21: 再次修正 - 强制图表竖向排列 -->
+                        <div class="grid grid-cols-1 gap-6"> 
                             
                             ${metrics.map(metric => `
                                 <div class="bg-gray-50 p-3 rounded-lg">
