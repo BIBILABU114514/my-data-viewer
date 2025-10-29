@@ -1035,6 +1035,7 @@
         /**
          * M8: 新增 - 导出数据卡片为 JPEG 图片
          * M22: 修正 - 添加延迟确保渲染完成
+         * M23: 修正 - 增加延迟到 700ms
          */
         window.exportCardAsImage = async (platformId, platformName) => {
             if (typeof html2canvas === 'undefined') {
@@ -1056,8 +1057,8 @@
             const detailsToHide = cardElement.querySelectorAll('details');
             detailsToHide.forEach(detail => detail.style.display = 'none');
 
-            // M22: 新增延迟 - 等待300ms确保图表等元素渲染完成
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // M23: 增加延迟到 700ms (原为 300ms)
+            await new Promise(resolve => setTimeout(resolve, 700));
 
             try {
                 const canvas = await html2canvas(cardElement, {
