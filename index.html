@@ -24,6 +24,8 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--neutral-bg);
+            /* M31: 修正 - 移除 letter-spacing，改用 onclone 修复 */
+            /* letter-spacing: 0.01em; */
         }
         .data-card {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
@@ -368,6 +370,11 @@
         // ====================================================================
         // 2. 数据处理与渲染
         // ====================================================================
+        
+        // M34: 新增 - 字体预加载函数 (根据报告 Section 2.2)
+        const waitForFonts = () => {
+            return document.fonts.ready;
+        };
 
         /**
          * 计算周环比增长百分比。
@@ -730,20 +737,22 @@
                     // M18: 完播率添加 %
                     const suffix = metric === 'completionRate' ? '%' : '';
 
+                    // M30: 新增 - 使用 span 包裹文本
                     return `
-                        <div class="col-span-1 border-t pt-3 flex flex-col items-center sm:items-start">
-                            <p class="text-sm font-medium text-gray-500">${METRIC_NAMES[metric]} 总和</p>
-                            <p class="text-2xl font-bold text-indigo-700 mt-1">${formatNumber(cwTotal)}${suffix}</p>
+                        <div class="col-span-1 border-t pt-3 flex flex-col items-center sm:items-start py-1"> 
+                            <p class="text-sm font-medium text-gray-500"><span>${METRIC_NAMES[metric]} 总和</span></p>
+                            <p class="text-2xl font-bold text-indigo-700 mt-1"><span>${formatNumber(cwTotal)}${suffix}</span></p>
                             <p class="text-xs ${trendClass} font-bold mt-1 flex items-center">
                                 ${changeStr === '+∞' ? '<i class="fa-solid fa-infinity mr-1"></i>' : `<i class="fa-solid ${iconClass} mr-1"></i>`}
-                                ${changeStr} (周环比)
+                                <span>${changeStr} (周环比)</span>
                             </p>
-                            <p class="text-xs text-gray-400 mt-1">上周: ${formatNumber(lwTotal)}${suffix}</p>
+                            <p class="text-xs text-gray-400 mt-1"><span>上周: ${formatNumber(lwTotal)}${suffix}</span></p>
                         </div>
                     `;
                 }).join('');
 
                 // 3. 渲染亮点卡片 (M1: 只显示一个亮点)
+                // M30: 新增 - 使用 span 包裹文本
                 const highlightsHTML = highlights.map(h => {
                     let displayValue = formatNumber(h.value);
                     let description = `单日最高值出现在 ${h.day}`; 
@@ -751,8 +760,8 @@
                     return `
                         <li class="flex items-center space-x-2 text-sm text-gray-700">
                             <i class="fa-solid ${h.icon} text-purple-500"></i>
-                            <span class="font-semibold text-gray-900">${h.metricName}</span>: 
-                            <span class="font-bold text-indigo-600">${displayValue}</span> (${description})
+                            <span class="font-semibold text-gray-900"><span>${h.metricName}</span></span>: 
+                            <span class="font-bold text-indigo-600"><span>${displayValue}</span></span> <span>(${description})</span>
                         </li>
                     `;
                 }).join('');
@@ -769,12 +778,14 @@
                 const hasManualHighlight = highlightTitle || highlightReason;
                 let finalHighlightsContent = '';
 
+                // M29: 新增 - 添加 py-1 修复导出偏移 (已在 M30 中移除, span 优先级更高)
                 if (hasAutoHighlight) {
                     finalHighlightsContent += `<ul class="space-y-1 ${hasManualHighlight ? 'mb-3 pb-3 border-b border-green-200' : ''}">${highlightsHTML}</ul>`;
                 }
                 if (hasManualHighlight) {
-                    const titleHTML = highlightTitle ? `<p class="font-semibold text-gray-800"><i class="fa-solid fa-pen-to-square mr-1 text-purple-500"></i> ${highlightTitle}</p>` : '';
-                    const reasonHTML = highlightReason ? `<p class="text-gray-700 mt-1 ${highlightTitle ? 'pl-5' : ''}"><i class="fa-solid fa-lightbulb mr-1 text-yellow-500"></i> ${highlightReason}</p>` : '';
+                    // M30: 新增 - 使用 span 包裹文本
+                    const titleHTML = highlightTitle ? `<p class="font-semibold text-gray-800"><i class="fa-solid fa-pen-to-square mr-1 text-purple-500"></i> <span>${highlightTitle}</span></p>` : '';
+                    const reasonHTML = highlightReason ? `<p class="text-gray-700 mt-1 ${highlightTitle ? 'pl-5' : ''}"><i class="fa-solid fa-lightbulb mr-1 text-yellow-500"></i> <span>${highlightReason}</span></p>` : '';
                     finalHighlightsContent += `<div class="text-sm">${titleHTML}${reasonHTML}</div>`;
                 }
                 
@@ -782,7 +793,7 @@
                     <!-- 平台名称和操作按钮 -->
                     <div class="flex justify-between items-center mb-4 border-b pb-4">
                         <!-- M7: 修正 - 移除平台名称后的指标列表 -->
-                        <h2 class="text-2xl font-extrabold text-gray-900">${platform}</h2>
+                        <h2 class="text-2xl font-extrabold text-gray-900"><span>${platform}</span></h2>
                         <div class="flex space-x-2">
                             <!-- M13: 移除 AI 洞察按钮 -->
                             
@@ -806,9 +817,9 @@
                     <!-- M4: 修正 - 本周数据亮点 (总是显示) -->
                     <div class="mb-6 p-4 border rounded-lg bg-green-50 border-green-300">
                         <p class="font-bold text-green-700 mb-2 flex items-center">
-                            <i class="fa-solid fa-trophy mr-2"></i> 本周数据亮点
+                            <i class="fa-solid fa-trophy mr-2"></i> <span>本周数据亮点</span>
                         </p>
-                        ${ (hasAutoHighlight || hasManualHighlight) ? finalHighlightsContent : '<p class="text-sm text-gray-600">暂无数据亮点，可编辑添加分析。</p>' }
+                        ${ (hasAutoHighlight || hasManualHighlight) ? finalHighlightsContent : '<p class="text-sm text-gray-600"><span>暂无数据亮点，可编辑添加分析。</span></p>' }
                     </div>
 
 
@@ -817,7 +828,7 @@
 
                     <!-- 每日趋势图表 -->
                     <div class="pt-4 border-t">
-                        <h3 class="text-xl font-semibold text-gray-800 mb-4">每日趋势对比 (周一到周五)</h3>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4"><span>每日趋势对比 (周一到周五)</span></h3>
                         
                         <!-- M21: 再次修正 - 强制图表竖向排列 -->
                         <div class="grid grid-cols-1 gap-6"> 
@@ -825,7 +836,7 @@
                             ${metrics.map(metric => `
                                 <div class="bg-gray-50 p-3 rounded-lg">
                                     <div class="flex justify-between items-center mb-2">
-                                        <p class="font-medium text-sm text-gray-600">${METRIC_NAMES[metric]} 变化</p>
+                                        <p class="font-medium text-sm text-gray-600"><span>${METRIC_NAMES[metric]} 变化</span></p>
                                         <button onclick="exportChartAsImage('chart-${id}-${metric}', '${platform}', '${metric}')" 
                                                 class="text-gray-500 hover:text-indigo-600 p-1 rounded transition duration-150" title="导出图表为 JPEG">
                                             <i class="fa-solid fa-download text-xs"></i>
@@ -835,7 +846,7 @@
                                         <canvas id="chart-${id}-${metric}"></canvas>
                                     </div>
                                     <details class="text-sm mt-3">
-                                        <summary class="cursor-pointer font-medium text-indigo-600 hover:text-indigo-800">查看详细数据表格</summary>
+                                        <summary class="cursor-pointer font-medium text-indigo-600 hover:text-indigo-800"><span>查看详细数据表格</span></summary>
                                         <div class="overflow-x-auto mt-2 bg-white rounded-lg p-2 border">
                                             ${generateDailyTable(dailyData, metric)}
                                         </div>
@@ -912,6 +923,9 @@
             
             // M18: 完播率添加 %
             const suffix = metricKey === 'completionRate' ? '%' : '';
+            
+            // M32: 修正 - 导出时会临时修改此值, 确保创建时是 3
+            const currentDevicePixelRatio = 3;
 
             const newChart = new Chart(ctx, {
                 type: 'line',
@@ -940,8 +954,8 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    // M3: 修正 #3 - 提高分辨率 (例如 3x)
-                    devicePixelRatio: 3, 
+                    // M32: 修正 - 使用变量
+                    devicePixelRatio: currentDevicePixelRatio, 
                     // M27: 修正 - 在导出卡片时会动态设置动画，这里保持默认启用
                     // animation: false, // (移除此行)
                     plugins: {
@@ -984,7 +998,7 @@
         
         /**
          * M20: 重写 - 导出总统计区域为图片
-         * 使用 html2canvas 导出包含标题、概览卡片和图表的整个区域。
+         * M34: 修正 - 添加字体预加载和 onclone 修复
          */
         window.exportGlobalChartSection = async () => {
             if (typeof html2canvas === 'undefined') {
@@ -1005,14 +1019,39 @@
             if (selectorElement) selectorElement.style.display = 'none';
             if (exportButton) exportButton.style.visibility = 'hidden';
 
+            // M34: 新增 - 资源预加载
+            try {
+                await waitForFonts();
+            } catch (fontError) {
+                console.warn("字体加载监控失败，将继续尝试导出...", fontError);
+            }
+
             try {
                 const canvas = await html2canvas(sectionElement, {
                     scale: 3,
                     backgroundColor: '#ffffff',
                     useCORS: true,
                     logging: false,
-                    // 忽略底部的切换栏
-                    ignoreElements: (element) => element.id === 'globalMetricSelector'
+                    ignoreElements: (element) => element.id === 'globalMetricSelector',
+                    // M34: 新增 - onclone CSS 修复
+                    onclone: (clonedDoc) => {
+                        // M36: 修正 - 应用报告 V 节的更精确修复
+                        clonedDoc.body.style.lineHeight = 'initial';
+                        const clonedTarget = clonedDoc.getElementById(sectionElement.id);
+                        if (clonedTarget) {
+                            clonedTarget.style.lineHeight = '1.5'; // 明确设置行高
+                        }
+                        
+                        // 禁用总图表的动画，防止截到一半
+                        const chartCanvas = clonedDoc.getElementById('globalViewsChart');
+                        if (chartCanvas) {
+                            const chartInstance = Chart.getChart(chartCanvas);
+                            if (chartInstance) {
+                                chartInstance.options.animation = false;
+                                chartInstance.update('none');
+                            }
+                        }
+                    }
                 });
 
                 const dataURL = canvas.toDataURL('image/jpeg', 0.95);
@@ -1073,11 +1112,8 @@
 
         /**
          * M8: 新增 - 导出数据卡片为 JPEG 图片
-         * M22: 修正 - 添加延迟确保渲染完成
-         * M23: 修正 - 增加延迟到 700ms
-         * M25: 修正 - 增加延迟到 1200ms
-         * M26: 修正 - 增加延迟到 2000ms (2秒)
-         * M27: 修正 - 截图前禁用图表动画
+         * ... (历史修正记录省略) ...
+         * M34: 修正 - 应用字体预加载和 onclone 修复, 移除 setTimeout
          */
         window.exportCardAsImage = async (platformId, platformName) => {
             if (typeof html2canvas === 'undefined') {
@@ -1091,35 +1127,45 @@
                 return;
             }
             
-            // M27: 查找卡片内的所有图表实例并禁用动画
-            const chartsToPause = [];
-            cardElement.querySelectorAll('canvas').forEach(canvas => {
-                const chartInstance = Chart.getChart(canvas); // 获取 Chart 实例
-                if (chartInstance && chartInstance.options.animation !== false) {
-                    chartInstance.options.animation = false; // 禁用动画
-                    chartInstance.update('none'); // 更新图表（无动画）
-                    chartsToPause.push(chartInstance); // 记录下来以便恢复
-                }
-            });
-
-            // 临时隐藏按钮，避免出现在截图中
+            // 临时隐藏按钮
             const buttonsToHide = cardElement.querySelectorAll('button');
             buttonsToHide.forEach(btn => btn.style.visibility = 'hidden');
 
-            // M9: 修正 - 临时隐藏 <details> 元素 (“查看详细数据表格”)
+            // 临时隐藏 <details>
             const detailsToHide = cardElement.querySelectorAll('details');
             detailsToHide.forEach(detail => detail.style.display = 'none');
 
-            // M26: 增加延迟到 2000ms (原为 1200ms) - 仍然保留
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // M34: 新增 - 资源预加载
+            try {
+                await waitForFonts();
+            } catch (fontError) {
+                console.warn("字体加载监控失败，将继续尝试导出...", fontError);
+            }
 
             try {
                 const canvas = await html2canvas(cardElement, {
-                    scale: 3, // 高分辨率
-                    backgroundColor: '#ffffff', // 白色背景
+                    scale: 3, 
+                    backgroundColor: '#ffffff', 
                     useCORS: true,
                     logging: false,
-                    onrendered: (canvas) => canvas // 确保图片资源加载完成
+                    // M34: 新增 - onclone CSS 修复
+                    onclone: (clonedDoc) => {
+                        // M36: 修正 - 应用报告 V 节的更精确修复
+                        clonedDoc.body.style.lineHeight = 'initial';
+                        const clonedTarget = clonedDoc.getElementById(cardElement.id);
+                        if (clonedTarget) {
+                            clonedTarget.style.lineHeight = '1.5'; // 明确设置行高
+                        }
+
+                        // 遍历克隆文档中的所有图表并禁用动画
+                        clonedDoc.querySelectorAll('canvas').forEach(canvas => {
+                            const chartInstance = Chart.getChart(canvas);
+                            if (chartInstance) {
+                                chartInstance.options.animation = false;
+                                chartInstance.update('none');
+                            }
+                        });
+                    }
                 });
                 
                 const dataURL = canvas.toDataURL('image/jpeg', 0.95);
@@ -1131,21 +1177,23 @@
                 document.body.removeChild(a);
                 showMessage(`卡片 [${platformName}] 已导出为 JPEG。`, 'success');
 
+                // M35: 修正 - 移除多余的 'FE'
             } catch (error) {
                 console.error("导出卡片失败:", error);
                 showMessage("导出卡片失败，请查看控制台。", 'error');
             } finally {
-                // M27: 恢复图表动画
-                chartsToPause.forEach(chartInstance => {
-                    chartInstance.options.animation = {}; // 恢复默认动画设置
-                    chartInstance.update('none'); // 无动画更新
-                });
-                
-                // 确保按钮重新显示
+                // 恢复按钮和 details
                 buttonsToHide.forEach(btn => btn.style.visibility = 'visible');
-                
-                // M9: 修正 - 确保 <details> 元素重新显示
                 detailsToHide.forEach(detail => detail.style.display = 'block');
+                
+                // M34: 恢复图表动画 (虽然卡片会重绘，但这是个好习惯)
+                cardElement.querySelectorAll('canvas').forEach(canvas => {
+                     const chartInstance = Chart.getChart(canvas);
+                     if (chartInstance && chartInstance.options.animation === false) {
+                         chartInstance.options.animation = true; 
+                         chartInstance.update('none');
+                     }
+                });
             }
         };
 
