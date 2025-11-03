@@ -124,8 +124,8 @@
     </div>
 
     <!-- 数据展示区域 -->
-    <!-- M24: 再次修正 - 确保 flex-wrap 布局 -->
-    <main id="dataContainer" class="max-w-7xl mx-auto flex flex-wrap gap-6 justify-center">
+    <!-- M39: 修正 - 布局改回 flex-col，实现单列 -->
+    <main id="dataContainer" class="max-w-7xl mx-auto flex flex-col gap-6">
         <!-- 平台数据卡片将在这里动态生成 -->
         <p id="loadingText" class="text-center text-gray-500 py-10 w-full"> 
             <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在加载数据...
@@ -133,7 +133,8 @@
     </main>
 
     <!-- 模态框 (Modal) 用于添加/编辑数据 -->
-    <div id="dataModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 hidden items-center justify-center p-4" onclick="closeModal(event)">
+    <!-- M50: 修正 - 移除 backdrop 上的 onclick 事件，防止误触关闭 -->
+    <div id="dataModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden data-card" onclick="event.stopPropagation()">
             <div class="p-6 max-h-[90vh] overflow-y-auto">
                 <h2 id="modalTitle" class="text-2xl font-bold text-gray-800 mb-6">添加每日数据</h2>
@@ -157,14 +158,15 @@
                     <p class="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">每日数据输入 (周一到周五)</p>
 
                     <!-- M4: 新增 - 手动亮点分析 -->
+                    <!-- M45: 修正 - 标签改为“本周亮点视频” -->
                     <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="highlightTitle" class="block text-sm font-medium text-gray-700 mb-1">亮点标题 (可选)</label>
-                            <input type="text" id="highlightTitle" placeholder="例如：XX视频爆款" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5">
+                            <label for="highlightTitle" class="block text-sm font-medium text-gray-700 mb-1">亮点视频标题 (可选)</label>
+                            <input type="text" id="highlightTitle" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5">
                         </div>
                         <div>
-                            <label for="highlightReason" class="block text-sm font-medium text-gray-700 mb-1">原因分析 (可选)</label>
-                            <input type="text" id="highlightReason" placeholder="例如：抓住了XX热点" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5">
+                            <label for="highlightReason" class="block text-sm font-medium text-gray-700 mb-1">亮点视频分析 (可选)</label>
+                            <input type="text" id="highlightReason" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5">
                         </div>
                     </div>
                     <!-- M4: 结束 -->
@@ -206,8 +208,14 @@
 
                     <!-- 按钮 -->
                     <div class="flex justify-between items-center pt-4 border-t">
-                        <button type="button" onclick="document.getElementById('dataModal').style.display='none'" class="text-gray-600 hover:text-gray-800 font-medium py-2 px-4 rounded-lg transition duration-150">取消</button>
+                        <!-- M51: 修正 - 优化取消按钮样式 -->
+                        <button type="button" onclick="document.getElementById('dataModal').style.display='none'" class="bg-white hover:bg-gray-100 text-gray-700 font-medium py-2 px-4 rounded-lg transition duration-150 border border-gray-300 shadow-sm">取消</button>
                         <div class="flex space-x-3">
+                            <!-- M47: 新增 - 数据迭代按钮 -->
+                            <button type="button" id="shiftWeekBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md hidden" onclick="shiftWeek()">
+                                <i class="fa-solid fa-clock-rotate-left mr-1"></i>
+                                数据迭代
+                            </button>
                             <button type="button" id="deleteBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md hidden" onclick="deletePlatform()">
                                 <i class="fa-solid fa-trash mr-1"></i>
                                 删除
@@ -219,6 +227,24 @@
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- M48: 新增 - 确认模态框 -->
+    <!-- M50: 修正 - 移除 backdrop 上的 onclick 事件 -->
+    <div id="confirmationModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-[60] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm" onclick="event.stopPropagation()">
+            <div class="p-6">
+                <h3 id="confirmationTitle" class="text-lg font-semibold text-gray-900">请确认</h3>
+                <p id="confirmationMessage" class="text-sm text-gray-600 mt-2">您确定要执行此操作吗？</p>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 flex justify-end space-x-3 rounded-b-xl">
+                <!-- M51: 修正 - 优化取消按钮样式 -->
+                <button id="confirmCancelBtn" type="button" class="bg-white hover:bg-gray-100 text-gray-700 font-medium py-2 px-4 rounded-lg transition duration-150 border border-gray-300 shadow-sm">取消</button>
+                <button id="confirmProceedBtn" type="button" class="text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md bg-red-600 hover:bg-red-700">
+                    确定
+                </button>
             </div>
         </div>
     </div>
@@ -417,46 +443,50 @@
         };
         
         /**
-         * 计算本周数据亮点 (M1: 只统计单日最高值，并只保留一条)。
+         * M46: 修正 - 计算*单个指标*的数据亮点
          */
-        const calculateWeeklyHighlights = (dailyData, metrics) => {
-            const highlights = [];
+        const getMetricHighlight = (dailyData, metric) => {
+            // M46: 修正 - 移除对 "completionRate" 和 "followerGrowth" 的限制
+            // if (["completionRate", "followerGrowth"].includes(metric)) {
+            //     return null;
+            // }
+
+            let maxDayValue = -Infinity; // M46: 修正 - 初始值设为-Infinity以正确处理粉丝增长(可能为负)
+            let maxDay = '';
+            let hasValue = false; // M46: 标记是否找到任何非0值
             
-            // M18: 完播率(%) 是 0-100 的值, 粉丝增长可能为负, 暂时只比较前5个
-            const comparableMetrics = metrics.filter(m => ["views", "likes", "comments", "shares", "saves"].includes(m));
-
-            comparableMetrics.forEach(metric => {
-                let maxDayValue = -1; 
-                let maxDay = '';
-                
-                DAYS.forEach((day) => {
-                    const cw = dailyData[day]?.[`cw_${metric}`] || 0;
-                    
-                    // 1. 寻找单日最高值 (仅本周)
-                    if (cw > maxDayValue) {
-                        maxDayValue = cw;
-                        maxDay = day;
-                    }
-                });
-
-                if (maxDayValue > 0) {
-                    highlights.push({
-                        metricName: METRIC_NAMES[metric],
-                        type: 'Highest Value',
-                        value: maxDayValue,
-                        day: maxDay,
-                        icon: 'fa-star'
-                    });
+            DAYS.forEach((day) => {
+                const cw = dailyData[day]?.[`cw_${metric}`] || 0;
+                if (cw > maxDayValue) {
+                    maxDayValue = cw;
+                    maxDay = day;
+                }
+                if (cw !== 0) {
+                    hasValue = true;
                 }
             });
 
-            // M1: 只保留一条（所有指标中的最大值）
-            if (highlights.length > 0) {
-                highlights.sort((a, b) => b.value - a.value); // 按值降序排序
-                return [highlights[0]]; // 返回整体的最高单日亮点
+            // M46: 修正 - 仅当有实际值(非0)且maxDay被设置时才显示
+            if (hasValue && maxDay) {
+                // M46: 粉丝增长可能最高值也是0或负数，但我们只关心正增长亮点
+                if (metric === 'followerGrowth' && maxDayValue <= 0) {
+                     return null;
+                }
+                // M46: 完播率为0也没意义
+                if (metric === 'completionRate' && maxDayValue === 0) {
+                    return null;
+                }
+
+                return {
+                    metricName: METRIC_NAMES[metric],
+                    type: 'Highest Value',
+                    value: maxDayValue,
+                    day: maxDay,
+                    icon: 'fa-star'
+                };
             }
             
-            return [];
+            return null; // M42: 如果没有亮点，返回 null
         };
 
         /**
@@ -700,7 +730,7 @@
 
 
         /**
-         * 动态渲染数据卡片和图表。
+         * M43: 重构 - 动态渲染数据卡片，分离平台备注和指标亮点
          */
         const renderDataCards = () => {
             const container = document.getElementById('dataContainer');
@@ -718,122 +748,79 @@
             }
 
             platforms.forEach(p => {
-                // M4: 解构出新增的字段
                 const { id, platform, dailyData, metrics, highlightTitle, highlightReason } = p;
                 
                 // 1. 计算周总和 (使用平台自己的 metrics)
                 const totals = calculatePlatformTotals(dailyData, metrics);
-                const highlights = calculateWeeklyHighlights(dailyData, metrics); // M1: 修正后的亮点计算
+                
+                // M43: 新增 - 检查是否有手动输入的备注
+                const hasManualNotes = highlightTitle || highlightReason;
+                
+                // M43: 新增 - 格式化手动备注 (优化布局)
+                // M45: 重构 - 优化布局，修复“分行不好看”
+                let platformNotesHTML = '';
+                if (hasManualNotes) {
+                    let notesContent = '';
+                    if (highlightTitle) {
+                        notesContent += `<div class="flex items-start">
+                                            <i class="fa-solid fa-pen-to-square mr-2 opacity-70 text-indigo-700 mt-1"></i>
+                                            <p class="font-semibold text-gray-800"><span>${highlightTitle}</span></p>
+                                         </div>`;
+                    }
+                    if (highlightReason) {
+                         notesContent += `<div class="flex items-start ${highlightTitle ? 'mt-1 pl-6' : ''}">
+                                            <i class="fa-solid fa-lightbulb mr-2 opacity-70 text-yellow-500 mt-1"></i>
+                                            <p class="text-sm text-gray-700"><span>${highlightReason}</span></p>
+                                          </div>`;
+                    }
+                    
+                    platformNotesHTML = `
+                        <div class="mb-6 p-4 border rounded-lg bg-indigo-50 border-indigo-200">
+                            <p class="font-bold text-indigo-700 mb-2 flex items-center">
+                                <i class="fa-solid fa-star mr-2"></i> <span>本周亮点视频</span>
+                            </p>
+                            <div class="space-y-1">
+                                ${notesContent}
+                            </div>
+                        </div>
+                    `;
+                }
+                // M45: 重构结束
 
-                // 2. 渲染总览卡片
-                let summaryHTML = metrics.map(metric => {
+
+                // M42: 重构 - 按指标逐行生成两栏布局
+                const metricRowsHTML = metrics.map((metric, index) => { 
+                    
+                    // 1. 生成左侧的数据总览 (只为当前指标)
                     const cwTotal = totals.cw[metric];
                     const lwTotal = totals.lw[metric];
                     const changeStr = calculateChange(cwTotal, lwTotal);
                     const isPositive = changeStr.startsWith('+') || changeStr === '0.00%';
                     const trendClass = isPositive ? 'text-green-trend' : 'text-red-trend';
                     const iconClass = isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
-                    
-                    // M18: 完播率添加 %
                     const suffix = metric === 'completionRate' ? '%' : '';
 
-                    // M30: 新增 - 使用 span 包裹文本
-                    return `
-                        <div class="col-span-1 border-t pt-3 flex flex-col items-center sm:items-start py-1"> 
-                            <p class="text-sm font-medium text-gray-500"><span>${METRIC_NAMES[metric]} 总和</span></p>
-                            <p class="text-2xl font-bold text-indigo-700 mt-1"><span>${formatNumber(cwTotal)}${suffix}</span></p>
-                            <p class="text-xs ${trendClass} font-bold mt-1 flex items-center">
-                                ${changeStr === '+∞' ? '<i class="fa-solid fa-infinity mr-1"></i>' : `<i class="fa-solid ${iconClass} mr-1"></i>`}
-                                <span>${changeStr} (周环比)</span>
-                            </p>
-                            <p class="text-xs text-gray-400 mt-1"><span>上周: ${formatNumber(lwTotal)}${suffix}</span></p>
+                    const summaryMetricHTML = `
+                        <div>
+                            <div class="bg-white p-4 rounded-lg border border-indigo-300"> 
+                                <p class="text-base font-medium text-gray-600"><span>${METRIC_NAMES[metric]} 总和</span></p>
+                                <p class="text-4xl font-extrabold text-indigo-700 mt-1"><span>${formatNumber(cwTotal)}${suffix}</span></p>
+                                <div class="flex justify-between items-baseline mt-2">
+                                    <p class="text-sm ${trendClass} font-bold flex items-center">
+                                        ${changeStr === '+∞' ? '<i class="fa-solid fa-infinity mr-1"></i>' : `<i class="fa-solid ${iconClass} mr-1"></i>`}
+                                        <span>${changeStr} (周环比)</span>
+                                    </p>
+                                    <p class="text-sm text-gray-500 mt-1"><span>上周: ${formatNumber(lwTotal)}${suffix}</span></p>
+                                </div>
+                            </div>
                         </div>
                     `;
-                }).join('');
 
-                // 3. 渲染亮点卡片 (M1: 只显示一个亮点)
-                // M30: 新增 - 使用 span 包裹文本
-                const highlightsHTML = highlights.map(h => {
-                    let displayValue = formatNumber(h.value);
-                    let description = `单日最高值出现在 ${h.day}`; 
-
-                    return `
-                        <li class="flex items-center space-x-2 text-sm text-gray-700">
-                            <i class="fa-solid ${h.icon} text-purple-500"></i>
-                            <span class="font-semibold text-gray-900"><span>${h.metricName}</span></span>: 
-                            <span class="font-bold text-indigo-600"><span>${displayValue}</span></span> <span>(${description})</span>
-                        </li>
-                    `;
-                }).join('');
-
-
-                const cardHTML = document.createElement('div');
-                // M26: 修正 - 添加 self-start 阻止高度拉伸
-                cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200 w-full lg:max-w-[calc(50%-0.75rem)] self-start"; 
-                // M8: 新增 - 为卡片添加唯一 ID
-                cardHTML.id = `data-card-${id}`;
-                
-                // M4: 组合自动亮点和手动分析
-                const hasAutoHighlight = highlights.length > 0;
-                const hasManualHighlight = highlightTitle || highlightReason;
-                let finalHighlightsContent = '';
-
-                // M29: 新增 - 添加 py-1 修复导出偏移 (已在 M30 中移除, span 优先级更高)
-                if (hasAutoHighlight) {
-                    finalHighlightsContent += `<ul class="space-y-1 ${hasManualHighlight ? 'mb-3 pb-3 border-b border-green-200' : ''}">${highlightsHTML}</ul>`;
-                }
-                if (hasManualHighlight) {
-                    // M30: 新增 - 使用 span 包裹文本
-                    const titleHTML = highlightTitle ? `<p class="font-semibold text-gray-800"><i class="fa-solid fa-pen-to-square mr-1 text-purple-500"></i> <span>${highlightTitle}</span></p>` : '';
-                    const reasonHTML = highlightReason ? `<p class="text-gray-700 mt-1 ${highlightTitle ? 'pl-5' : ''}"><i class="fa-solid fa-lightbulb mr-1 text-yellow-500"></i> <span>${highlightReason}</span></p>` : '';
-                    finalHighlightsContent += `<div class="text-sm">${titleHTML}${reasonHTML}</div>`;
-                }
-                
-                cardHTML.innerHTML = `
-                    <!-- 平台名称和操作按钮 -->
-                    <div class="flex justify-between items-center mb-4 border-b pb-4">
-                        <!-- M7: 修正 - 移除平台名称后的指标列表 -->
-                        <h2 class="text-2xl font-extrabold text-gray-900"><span>${platform}</span></h2>
-                        <div class="flex space-x-2">
-                            <!-- M13: 移除 AI 洞察按钮 -->
-                            
-                            <!-- M8: 新增 - 导出卡片按钮 -->
-                            <button id="exportCardBtn-${id}" onclick="exportCardAsImage('${id}', '${platform}')" class="text-gray-500 hover:text-indigo-600 transition duration-150" title="导出此卡片为图片">
-                                <i class="fa-solid fa-image text-lg"></i>
-                            </button>
-                            
-                            <button onclick="editPlatform('${id}')" class="text-gray-500 hover:text-indigo-600 transition duration-150" title="编辑数据">
-                                <i class="fa-solid fa-edit text-lg"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- 每日数据总览 -->
-                    <!-- M18: 修正 - 调整栅格布局以适应更多指标 -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-                        ${summaryHTML}
-                    </div>
-                    
-                    <!-- M4: 修正 - 本周数据亮点 (总是显示) -->
-                    <div class="mb-6 p-4 border rounded-lg bg-green-50 border-green-300">
-                        <p class="font-bold text-green-700 mb-2 flex items-center">
-                            <i class="fa-solid fa-trophy mr-2"></i> <span>本周数据亮点</span>
-                        </p>
-                        ${ (hasAutoHighlight || hasManualHighlight) ? finalHighlightsContent : '<p class="text-sm text-gray-600"><span>暂无数据亮点，可编辑添加分析。</span></p>' }
-                    </div>
-
-
-                    <!-- M13: 移除 AI 洞察报告显示区域 -->
-
-
-                    <!-- 每日趋势图表 -->
-                    <div class="pt-4 border-t">
-                        <h3 class="text-xl font-semibold text-gray-800 mb-4"><span>每日趋势对比 (周一到周五)</span></h3>
-                        
-                        <!-- M21: 再次修正 - 强制图表竖向排列 -->
-                        <div class="grid grid-cols-1 gap-6"> 
-                            
-                            ${metrics.map(metric => `
+                    // 2. 生成右侧的每日趋势图
+                    const dailyTrendHTML = `
+                        <div class="lg:w-3/5 xl:w-2/3 lg:border-l lg:pl-8">
+                            <div class="pt-4 lg:pt-0">
+                                <h3 class="text-xl font-semibold text-gray-800 mb-4"><span>每日趋势对比 (周一到周五)</span></h3>
                                 <div class="bg-gray-50 p-3 rounded-lg">
                                     <div class="flex justify-between items-center mb-2">
                                         <p class="font-medium text-sm text-gray-600"><span>${METRIC_NAMES[metric]} 变化</span></p>
@@ -852,10 +839,87 @@
                                         </div>
                                     </details>
                                 </div>
-                            `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // M42: 新增 - 为每个指标生成专属的亮点框内容
+                    let highlightBoxContent = '';
+                    const autoHighlight = getMetricHighlight(dailyData, metric); // M42: 获取指标专属自动亮点
+                    
+                    // M43: 移除 hasManualHighlight, 因为它被移到卡片顶部了
+
+                    if (autoHighlight) {
+                        let displayValue = formatNumber(autoHighlight.value);
+                        // M46: 修正 - 完播率添加 %
+                        const suffixHighlight = metric === 'completionRate' ? '%' : '';
+                        let description = `单日最高值出现在 ${autoHighlight.day}`; 
+                        const autoHighlightHTML = `
+                            <li class="flex items-center space-x-2 text-sm text-gray-700">
+                                <i class="fa-solid ${autoHighlight.icon} text-purple-500"></i>
+                                <span class="font-semibold text-gray-900"><span>${autoHighlight.metricName}</span></span>: 
+                                <span class="font-bold text-indigo-600"><span>${displayValue}${suffixHighlight}</span></span> <span>(${description})</span>
+                            </li>
+                        `;
+                        highlightBoxContent += `<ul class="space-y-1">${autoHighlightHTML}</ul>`;
+                    } else {
+                         // M43: 修正 - 如果这个指标没有自动亮点，显示 '暂无'
+                         highlightBoxContent = '<p class="text-sm text-gray-600"><span>暂无自动数据亮点。</span></p>';
+                    }
+                    
+                    // M42: 创建指标专属亮点框
+                    const metricHighlightBoxHTML = `
+                        <div class="mt-6 p-4 border rounded-lg bg-green-50 border-green-300">
+                            <p class="font-bold text-green-700 mb-2 flex items-center">
+                                <i class="fa-solid fa-trophy mr-2"></i> <span>本周数据亮点</span>
+                            </p>
+                            ${highlightBoxContent}
+                        </div>
+                    `;
+
+                    // 3. 组合成一行 (M40: 添加 first:mt-0 first:border-t-0 first:pt-0 移除第一行的上边距和分割线)
+                    return `
+                        <div class="flex flex-col lg:flex-row lg:gap-8 mt-6 border-t pt-6 lg:mt-8 lg:pt-8 first:mt-0 first:border-t-0 first:pt-0">
+                            <!-- M42: 修正 - 左侧列现在包含总览 + 指标亮点 -->
+                            <div class="lg:w-2/5 xl:w-1/3 flex-shrink-0">
+                                <h3 class="text-xl font-semibold text-gray-800 mb-4"><span>数据总览</span></h3>
+                                ${summaryMetricHTML}
+                                ${metricHighlightBoxHTML} <!-- M42: 替换了 M41 的 logic -->
+                            </div>
+                            ${dailyTrendHTML}
+                        </div>
+                    `;
+                }).join('');
+                // M40: 重构结束
+
+                const cardHTML = document.createElement('div');
+                cardHTML.className = "data-card bg-white rounded-xl p-6 shadow-lg border border-gray-200 w-full"; 
+                cardHTML.id = `data-card-${id}`;
+                
+                cardHTML.innerHTML = `
+                    <!-- 平台名称和操作按钮 -->
+                    <div class="flex justify-between items-center mb-4 border-b pb-4">
+                        <h2 class="text-2xl font-extrabold text-gray-900"><span>${platform}</span></h2>
+                        <div class="flex space-x-2">
+                            <button id="exportCardBtn-${id}" onclick="exportCardAsImage('${id}', '${platform}')" class="text-gray-500 hover:text-indigo-600 transition duration-150" title="导出此卡片为图片">
+                                <i class="fa-solid fa-image text-lg"></i>
+                            </button>
+                            <button onclick="editPlatform('${id}')" class="text-gray-500 hover:text-indigo-600 transition duration-150" title="编辑数据">
+                                <i class="fa-solid fa-edit text-lg"></i>
+                            </button>
                         </div>
                     </div>
+                    
+                    <!-- M43: 新增 - 平台备注 (手动输入) -->
+                    ${platformNotesHTML}
+                                        
+                    <!-- M40: 新增 - 按指标逐行渲染的容器 -->
+                    <!-- M41: 移除了顶部的亮点框 -->
+                    <div class="mt-6">
+                        ${metricRowsHTML}
+                    </div>
                 `;
+
                 container.appendChild(cardHTML);
 
                 // 4. 渲染图表
@@ -1039,7 +1103,8 @@
                         clonedDoc.body.style.lineHeight = 'initial';
                         const clonedTarget = clonedDoc.getElementById(sectionElement.id);
                         if (clonedTarget) {
-                            clonedTarget.style.lineHeight = '1.5'; // 明确设置行高
+                            // M37: 修正 - 尝试 'normal' 而不是 '1.5'
+                            clonedTarget.style.lineHeight = 'normal';
                         }
                         
                         // 禁用总图表的动画，防止截到一半
@@ -1105,7 +1170,7 @@
 
             } catch (error) {
                 console.error("导出图表失败:", error);
-                showMessage("导出图表失败，请检查控制台错误。", 'error');
+                showMessage("导出图表失败，请查看控制台错误。", 'error');
             }
         };
 
@@ -1154,7 +1219,8 @@
                         clonedDoc.body.style.lineHeight = 'initial';
                         const clonedTarget = clonedDoc.getElementById(cardElement.id);
                         if (clonedTarget) {
-                            clonedTarget.style.lineHeight = '1.5'; // 明确设置行高
+                            // M37: 修正 - 尝试 'normal' 而不是 '1.5'
+                            clonedTarget.style.lineHeight = 'normal';
                         }
 
                         // 遍历克隆文档中的所有图表并禁用动画
@@ -1163,6 +1229,7 @@
                             if (chartInstance) {
                                 chartInstance.options.animation = false;
                                 chartInstance.update('none');
+
                             }
                         });
                     }
@@ -1302,6 +1369,45 @@
         const deleteBtn = document.getElementById('deleteBtn');
         const dailyInputBody = document.getElementById('dailyInputBody');
         const metricSelectionDiv = document.getElementById('metricSelection');
+        // M48: 新增 - 确认模态框
+        const confirmationModal = document.getElementById('confirmationModal');
+        const confirmationMessage = document.getElementById('confirmationMessage');
+        const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+        const confirmProceedBtn = document.getElementById('confirmProceedBtn');
+        let onConfirmCallback = null;
+
+        // M48: 新增 - 打开确认模态框
+        const openConfirmationModal = (message, confirmText = '确定', confirmColor = 'bg-red-600', onConfirm) => {
+            confirmationMessage.textContent = message;
+            confirmProceedBtn.textContent = confirmText;
+            
+            // 动态设置按钮颜色
+            const colorClasses = confirmColor.split(' ');
+            const mainColor = colorClasses[0]; // e.g., 'bg-red-600'
+            const hoverColor = 'hover:' + mainColor.replace('-600', '-700'); // e.g., 'hover:bg-red-700'
+            
+            // 重置颜色
+            confirmProceedBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-blue-600', 'hover:bg-blue-700');
+            confirmProceedBtn.classList.add(mainColor, hoverColor);
+            
+            onConfirmCallback = onConfirm;
+            confirmationModal.style.display = 'flex';
+        };
+
+        // M48: 新增 - 关闭确认模态框
+        const closeConfirmationModal = () => {
+            onConfirmCallback = null;
+            confirmationModal.style.display = 'none';
+        };
+
+        // M48: 新增 - 绑定确认模态框按钮
+        confirmCancelBtn.onclick = closeConfirmationModal;
+        confirmProceedBtn.onclick = () => {
+            if (typeof onConfirmCallback === 'function') {
+                onConfirmCallback();
+            }
+            closeConfirmationModal();
+        };
         
         // M4: 新增 - 动态显隐表格列
         window.toggleMetricColumn = (metric) => {
@@ -1321,28 +1427,42 @@
         };
 
         /**
-         * 生成每日输入行。
+         * M49: 重构 - 生成每日输入行
+         * 不再使用 getVal，而是在调用时直接设置值，以修复迭代 Bug
          */
         const generateDailyInputRows = (initialData = {}) => {
-            const getVal = (day, period, metric) => {
-                const value = initialData[day]?.[`${period}_${metric}`];
-                // M15: 修正 - 如果值是 0 或未定义，返回空字符串
-                return (value !== undefined && value !== null && value !== 0 && value !== "") ? value : '';
-            };
-
+            // 1. 先用空值创建 HTML 结构
             dailyInputBody.innerHTML = DAYS.map(day => {
                 return `
                     <tr class="border-b border-gray-100">
                         <td class="sticky left-0 bg-white font-medium text-gray-700 z-10">${day}</td>
                         ${METRICS.map(metric => `
-                            <!-- M4: 动态列 - 添加CSS类 -->
-                            <!-- M18: 完播率(%) 使用 "number" 类型, 但提示用户输入 50 而不是 0.5 -->
-                            <td class="metric-col-${metric}"><input type="number" id="${day}_cw_${metric}" value="${getVal(day, 'cw', metric)}" min="0"></td>
-                            <td class="metric-col-${metric}"><input type="number" id="${day}_lw_${metric}" value="${getVal(day, 'lw', metric)}" min="0"></td>
+                            <td class="metric-col-${metric}"><input type="number" id="${day}_cw_${metric}" value="" min="0"></td>
+                            <td class="metric-col-${metric}"><input type="number" id="${day}_lw_${metric}" value="" min="0"></td>
                         `).join('')}
                     </tr>
                 `;
             }).join('');
+
+            // 2. 循环遍历 DOM 元素并设置值 (如果 initialData 存在)
+            if (Object.keys(initialData).length > 0) {
+                DAYS.forEach(day => {
+                    METRICS.forEach(metric => {
+                        const cwValue = initialData[day]?.[`cw_${metric}`];
+                        const lwValue = initialData[day]?.[`lw_${metric}`];
+
+                        const cwInput = document.getElementById(`${day}_cw_${metric}`);
+                        if (cwInput && cwValue !== 0 && cwValue !== null && cwValue !== undefined) {
+                            cwInput.value = cwValue;
+                        }
+                        
+                        const lwInput = document.getElementById(`${day}_lw_${metric}`);
+                        if (lwInput && lwValue !== 0 && lwValue !== null && lwValue !== undefined) {
+                            lwInput.value = lwValue;
+                        }
+                    });
+                });
+            }
         };
         
         /**
@@ -1399,6 +1519,7 @@
             dataForm.reset();
             platformIdInput.value = '';
             deleteBtn.classList.add('hidden');
+            document.getElementById('shiftWeekBtn').classList.add('hidden'); // M47: 隐藏迭代按钮
             
             // M4: 清空亮点字段
             document.getElementById('highlightTitle').value = "";
@@ -1423,6 +1544,7 @@
             modalTitle.textContent = `编辑 ${platformData.platform} 每日数据`;
             platformIdInput.value = id;
             deleteBtn.classList.remove('hidden');
+            document.getElementById('shiftWeekBtn').classList.remove('hidden'); // M47: 显示迭代按钮
 
             document.getElementById('platformName').value = platformData.platform;
             
@@ -1440,12 +1562,82 @@
         };
         
         /**
-         * 关闭模态框 (点击背景时)。
+         * M50: 修正 - 移除该函数，因为它不再被使用
          */
-        window.closeModal = (event) => {
-            if (event.target.id === 'dataModal') {
-                dataModal.style.display = 'none';
+        // window.closeModal = (event) => {
+        //     if (event.target.id === 'dataModal' || event.target.id === 'confirmationModal') {
+        //         dataModal.style.display = 'none';
+        //         // M48: 修正 - 确保确认框也关闭
+        //         closeConfirmationModal(); 
+        //     }
+        // };
+
+        /**
+         * M47: 新增 - 数据迭代 (周数据轮替)
+         * M48: 修正 - 添加确认步骤
+         * M49-B: 修正 - 迭代逻辑，防止空值覆盖
+         */
+        window.shiftWeek = () => {
+            // M49: 检查“本周”数据是否已为空，防止重复迭代
+            let hasCwData = false;
+            DAYS.forEach(day => {
+                const selectedMetrics = METRICS.filter(metric => 
+                    document.getElementById(`metric-${metric}`).checked
+                );
+                selectedMetrics.forEach(metric => {
+                    const currentWeekInput = document.getElementById(`${day}_cw_${metric}`);
+                    if (currentWeekInput && (parseInt(currentWeekInput.value) || 0) !== 0) {
+                        hasCwData = true;
+                    }
+                });
+            });
+
+            if (!hasCwData) {
+                showMessage("“本周”数据已为空，无需迭代。", "info");
+                return; // 阻止迭代
             }
+            
+            // M48: 修正 - 添加确认步骤
+            openConfirmationModal(
+                '您确定要迭代数据吗？“本周”数据将被移至“上周”，“本周”将被清空。',
+                '确认迭代',
+                'bg-blue-600',
+                () => { // onConfirm callback
+                    const newDailyData = createEmptyDailyData(); 
+        
+                    DAYS.forEach(day => {
+                        METRICS.forEach(metric => {
+                            // 1. 从表单读取当前的“本周”和“上周”数据
+                            const currentWeekInput = document.getElementById(`${day}_cw_${metric}`);
+                            const cwValue = parseInt(currentWeekInput.value) || 0;
+                            
+                            const lastWeekInput = document.getElementById(`${day}_lw_${metric}`);
+                            const lwValue = parseInt(lastWeekInput.value) || 0;
+                            
+                            // 2. M49-B: 修正 - 迭代逻辑
+                            // 只有当“本周”有数据时，才用它覆盖“上周”
+                            // 否则，“上周”保留原样
+                            if (cwValue !== 0) {
+                                newDailyData[day][`lw_${metric}`] = cwValue;
+                            } else {
+                                newDailyData[day][`lw_${metric}`] = lwValue;
+                            }
+                            
+                            // 3. 将“本周”数据清空
+                            newDailyData[day][`cw_${metric}`] = 0;
+                        });
+                    });
+
+                    // 4. 用新数据重新填充表单
+                    generateDailyInputRows(newDailyData);
+                    
+                    // 5. 重新应用列可见性
+                    updateMetricColumnVisibility();
+                    
+                    // 6. 提示用户
+                    showMessage("数据已迭代！请在“本周”栏输入新数据并保存。", "success");
+                }
+            );
         };
 
         /**
@@ -1529,23 +1721,24 @@
             const id = platformIdInput.value;
             const platformName = document.getElementById('platformName').value;
 
-            // M16: 修正 - 移除了 window.confirm()
-            // 之前的 window.confirm() 会在当前环境中被屏蔽，导致功能失效。
-            // 理想情况下应使用自定义模态框，但为了快速修复，我们先让删除功能可用。
-            // if (!window.confirm(`确定要删除平台 [${platformName}] 的数据吗？`)) {
-            //     return;
-            // }
-
-            try {
-                // M17: 修正 - 简化数据库路径
-                const docRef = doc(db, `users/${userId}/${COLLECTION_NAME}`, id);
-                await deleteDoc(docRef);
-                showMessage(`平台 [${platformName}] 数据已删除!`, 'success');
-                dataModal.style.display = 'none';
-            } catch (error) {
-                console.error("删除数据失败:", error);
-                showMessage("删除数据失败，请查看控制台错误。", 'error');
-            }
+            // M48: 修正 - 添加确认步骤
+            openConfirmationModal(
+                `您确定要删除平台 [${platformName}] 吗？此操作无法撤销。`,
+                '确认删除',
+                'bg-red-600',
+                async () => { // onConfirm callback
+                    try {
+                        // M17: 修正 - 简化数据库路径
+                        const docRef = doc(db, `users/${userId}/${COLLECTION_NAME}`, id);
+                        await deleteDoc(docRef);
+                        showMessage(`平台 [${platformName}] 数据已删除!`, 'success');
+                        dataModal.style.display = 'none';
+                    } catch (error) {
+                        console.error("删除数据失败:", error);
+                        showMessage("删除数据失败，请查看控制台错误。", 'error');
+                    }
+                }
+            );
         };
 
         // 绑定添加按钮事件
